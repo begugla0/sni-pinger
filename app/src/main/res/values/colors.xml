@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#BB86FC</color>
+    <color name="primary_dark">#3700B3</color>
+    <color name="accent">#03DAC6</color>
+
+    <color name="bg_app">#121212</color>
+    <color name="card_bg">#1E1E1E</color>
+    <color name="input_bg">#2C2C2C</color>
+
+    <color name="status_ok">#4CAF50</color>
+    <color name="status_error">#F44336</color>
+    <color name="status_warning">#FF9800</color>
+
+    <color name="text_main">#E1E1E1</color>
+    <color name="text_sub">#B0B0B0</color>
+    <color name="divider">#333333</color>
+
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+
+    <!-- Material Components compatibility -->
+    <color name="purple_200">#BB86FC</color>
+    <color name="purple_500">#6200EE</color>
+    <color name="purple_700">#3700B3</color>
+    <color name="teal_200">#03DAC6</color>
+    <color name="teal_700">#018786</color>
+</resources>
