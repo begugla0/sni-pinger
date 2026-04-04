@@ -14,8 +14,8 @@ android {
         applicationId = "com.begugla.snipinger"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1-BETA"
+        versionCode = 3
+        versionName = "1.2-BETA"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

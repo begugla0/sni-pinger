@@ -1,48 +1,74 @@
 package com.begugla.snipinger
 
-import android.util.Log
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import android.os.Build
 import java.security.cert.X509Certificate
 import javax.net.ssl.*
 import kotlin.system.measureTimeMillis
+import kotlinx.coroutines.*
 
 class WhitelistChecker {
-
-    private val TAG = "WhitelistChecker"
 
     fun checkIp(
         ip: String,
         sni: String,
-        timeout: Int = 5000,
-        port: Int = 443,
-        checkDns: Boolean = true
+        timeout: Int = 5
     ): CheckResult {
-        val result = CheckResult(ip = ip, sni = sni, port = port, timeout = timeout / 1000f)
+        val result = CheckResult(ip = ip, sni = sni, port = 443, timeout = timeout.toFloat())
         val startTime = System.currentTimeMillis()
+        val timeoutMs = timeout * 1000
+        // Tighter timeouts for secondary checks to keep total time manageable
+        val secondaryTimeoutMs = minOf(3000, timeoutMs)
 
         try {
-            // Этап 1: IP Info
-            _ipInfo(ip, result)
+            // ============ Phase 1: Parallel lightweight checks ============
+            runBlocking {
+                // All these are independent and network-bound — run them concurrently
+                val geoJob = async(Dispatchers.IO) { _ipGeoInfo(ip, result) }
+                val domainJob = async(Dispatchers.IO) { _sniOwnership(sni, result) }
+                val dnsJob = async(Dispatchers.IO) { _dnsCheck(sni, ip, result) }
+                val pingJob = async(Dispatchers.IO) { _approximatePing(ip, secondaryTimeoutMs, result) }
+                val portsJob = async(Dispatchers.IO) { _tcpPorts(ip, secondaryTimeoutMs, result) }
 
-            // Этап 2: DNS
-            if (checkDns) {
-                _dnsCheck(sni, ip, result)
+                // All start at the same time, wait for all to finish
+                awaitAll(geoJob, domainJob, dnsJob, pingJob, portsJob)
             }
 
-            // Этап 3: TCP
-            val socket = _tcpConnect(ip, port, timeout, result)
+            // ============ Phase 2: Sequential TCP + TLS + HTTP (these depend on each other) ============
+
+            // Step 1: TCP connect to 443
+            val socket = _connectSocket(ip, 443, timeoutMs, result)
 
             if (socket != null) {
-                // Этап 4: TLS
-                val tlsSocket = _tlsHandshake(socket, sni, timeout, result)
-                if (tlsSocket != null) {
-                    // Этап 5: HTTP
-                    _httpRequest(tlsSocket, sni, timeout, result)
-                    try { tlsSocket.close() } catch (e: Exception) {}
-                } else {
-                    try { socket.close() } catch (e: Exception) {}
+                // Step 2: Full TLS Handshake (reuses existing socket)
+                _fullTlsHandshake(socket, sni, timeoutMs, result)
+
+                // Step 3: Parallel TLS version checks and H2 + HTTP checks
+                runBlocking {
+                    // TLS 1.2 and 1.3 checks are independent
+                    val tls12Job = async(Dispatchers.IO) {
+                        _tlsVersionCheck(ip, sni, "TLSv1.2", secondaryTimeoutMs) { ok ->
+                            result.tls12Ok = ok
+                        }
+                    }
+                    val tls13Job = async(Dispatchers.IO) {
+                        _tlsVersionCheck(ip, sni, "TLSv1.3", secondaryTimeoutMs) { ok ->
+                            result.tls13Ok = ok
+                        }
+                    }
+                    val h2Job = async(Dispatchers.IO) {
+                        if (Build.VERSION.SDK_INT >= 29) {
+                            _checkH2Support(ip, sni, secondaryTimeoutMs, result)
+                        }
+                    }
+                    val httpJob = async(Dispatchers.IO) {
+                        // Combined HTTP: do GET to capture status/headers, then HEAD if needed
+                        _combinedHttpCheck(ip, sni, timeoutMs, result)
+                    }
+
+                    awaitAll(tls12Job, tls13Job, h2Job, httpJob)
                 }
             }
         } catch (e: Exception) {
@@ -53,6 +79,8 @@ class WhitelistChecker {
         result.totalTime = (System.currentTimeMillis() - startTime) / 1000.0
         return result
     }
+
+    // ===== Phase 1: Parallel independent checks =====
 
     private fun _ipInfo(ip: String, result: CheckResult) {
         try {
@@ -65,39 +93,103 @@ class WhitelistChecker {
         }
     }
 
+    private fun _ipGeoInfo(ip: String, result: CheckResult) {
+        _ipInfo(ip, result) // Also sets local IP info
+        try {
+            val info = IpInfoChecker.getIpInfo(ip)
+            if (info != null) result.ipGeoInfo = info
+        } catch (e: Exception) { /* non-critical */ }
+    }
+
+    private fun _sniOwnership(sni: String, result: CheckResult) {
+        try {
+            val domainIps = IpInfoChecker.getDomainIps(sni)
+            result.domainResolvedIps = domainIps
+            if (domainIps.isNotEmpty()) {
+                val domainGeo = IpInfoChecker.getIpInfo(domainIps.first())
+                if (domainGeo?.org != null) result.domainOwnerOrg = domainGeo.org
+            }
+        } catch (e: Exception) { /* non-critical */ }
+    }
+
     private fun _dnsCheck(sni: String, ip: String, result: CheckResult) {
         val start = System.currentTimeMillis()
         try {
             val addresses = InetAddress.getAllByName(sni)
             result.dnsResolveTime = (System.currentTimeMillis() - start) / 1000.0
-            val resolved = addresses.map { it.hostAddress }
-            result.dnsResolvesTo = resolved
-            result.ipMatchesDns = resolved.contains(ip)
+            result.dnsResolvesTo = addresses.mapNotNull { it.hostAddress }
+            result.ipMatchesDns = result.dnsResolvesTo.contains(ip)
         } catch (e: Exception) {
             result.errors.add("dns: ${e.message}")
         }
     }
 
-    private fun _tcpConnect(ip: String, port: Int, timeout: Int, result: CheckResult): Socket? {
+    private fun _approximatePing(ip: String, timeoutMs: Int, result: CheckResult) {
+        try {
+            val socket = Socket()
+            val start = System.currentTimeMillis()
+            socket.connect(InetSocketAddress(ip, 443), minOf(1500, timeoutMs))
+            result.rttMs = (System.currentTimeMillis() - start).toDouble()
+            socket.close()
+        } catch (e: Exception) { /* handled elsewhere */ }
+    }
+
+    private fun _tcpPorts(ip: String, timeoutMs: Int, result: CheckResult) {
+        runBlocking {
+            val job80 = async(Dispatchers.IO) {
+                checkPort(ip, 80, minOf(1500, timeoutMs)) { reachable, time ->
+                    result.tcp80Reachable = reachable
+                    result.tcp80ConnectTime = time
+                }
+            }
+            val job53 = async(Dispatchers.IO) {
+                checkPort(ip, 53, minOf(1500, timeoutMs)) { reachable, _ ->
+                    result.tcp53Reachable = reachable
+                }
+            }
+            val job8080 = async(Dispatchers.IO) {
+                checkPort(ip, 8080, minOf(1500, timeoutMs)) { reachable, _ ->
+                    result.tcp8080Reachable = reachable
+                }
+            }
+            awaitAll(job80, job53, job8080)
+        }
+    }
+
+    private fun checkPort(ip: String, port: Int, timeoutMs: Int, callback: (Boolean, Double?) -> Unit) {
+        try {
+            val socket = Socket()
+            val start = System.currentTimeMillis()
+            socket.connect(InetSocketAddress(ip, port), timeoutMs)
+            socket.close()
+            callback(true, (System.currentTimeMillis() - start) / 1000.0)
+        } catch (e: Exception) {
+            callback(false, null)
+        }
+    }
+
+    // ===== Phase 2: Sequential TCP 443 + TLS + HTTP =====
+
+    private fun _connectSocket(ip: String, port: Int, timeoutMs: Int, result: CheckResult): Socket? {
         val socket = Socket()
         val start = System.currentTimeMillis()
         return try {
-            socket.connect(InetSocketAddress(ip, port), timeout)
+            socket.connect(InetSocketAddress(ip, port), timeoutMs)
             result.tcpConnectTime = (System.currentTimeMillis() - start) / 1000.0
             result.tcpReachable = true
-            result.rttMs = result.tcpConnectTime!! * 1000.0
+            if (result.rttMs == null) result.rttMs = result.tcpConnectTime!! * 1000.0
             socket
         } catch (e: Exception) {
             result.tcpReachable = false
-            result.errors.add("tcp: ${e.message}")
-            try { socket.close() } catch (ex: Exception) {}
+            result.errors.add("tcp 443: ${e.message}")
+            try { socket.close() } catch (_: Exception) {}
             null
         }
     }
 
-    private fun _tlsHandshake(rawSocket: Socket, sni: String, timeout: Int, result: CheckResult): SSLSocket? {
+    private fun _fullTlsHandshake(rawSocket: Socket, sni: String, timeoutMs: Int, result: CheckResult) {
         val start = System.currentTimeMillis()
-        return try {
+        try {
             val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
                 override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
                 override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
@@ -107,87 +199,223 @@ class WhitelistChecker {
             val sslContext = SSLContext.getInstance("TLS")
             sslContext.init(null, trustAllCerts, java.security.SecureRandom())
             val factory = sslContext.socketFactory
-            
+
             val sslSocket = factory.createSocket(rawSocket, rawSocket.inetAddress.hostAddress, rawSocket.port, true) as SSLSocket
-            sslSocket.soTimeout = timeout
-            
-            // Set SNI
+            sslSocket.soTimeout = timeoutMs
+
             val sslParams = sslSocket.sslParameters
             sslParams.serverNames = listOf(SNIHostName(sni))
             sslSocket.sslParameters = sslParams
 
             sslSocket.startHandshake()
-            
+
             result.tlsTime = (System.currentTimeMillis() - start) / 1000.0
             result.tlsOk = true
             val session = sslSocket.session
             result.tlsVersion = session.protocol
             result.tlsCipher = session.cipherSuite
-            
+
             val certs = session.peerCertificates
             if (certs.isNotEmpty() && certs[0] is X509Certificate) {
                 val x509 = certs[0] as X509Certificate
                 result.certSubject = x509.subjectX500Principal.name
                 result.certIssuer = x509.issuerX500Principal.name
-                
-                // Simplified SNI match check
+                result.certNotBefore = x509.notBefore?.toString()
+                result.certNotAfter = x509.notAfter?.toString()
+
+                result.certSanList = try {
+                    x509.subjectAlternativeNames?.filter { it[0] as Int == 2 }?.map { it[1] as String } ?: emptyList()
+                } catch (_: Exception) { emptyList() }
+
                 val cn = x509.subjectX500Principal.name.substringAfter("CN=").substringBefore(",")
-                result.certSniMatch = sni.equals(cn, ignoreCase = true) || (cn.startsWith("*.") && sni.endsWith(cn.substring(1)))
+                val sanMatch = result.certSanList.any { san ->
+                    sni.equals(san, ignoreCase = true) || (san.startsWith("*.") && sni.endsWith(san.substring(1)))
+                }
+                result.certSniMatch = sanMatch || sni.equals(cn, ignoreCase = true) || (cn.startsWith("*.") && sni.endsWith(cn.substring(1)))
             }
-            
-            sslSocket
+
+            sslSocket.close()
         } catch (e: Exception) {
             result.tlsOk = false
             result.errors.add("tls: ${e.message}")
-            null
         }
     }
 
-    private fun _httpRequest(tlsSocket: SSLSocket, sni: String, timeout: Int, result: CheckResult) {
+    private fun _tlsVersionCheck(ip: String, sni: String, protocol: String, timeoutMs: Int, callback: (Boolean) -> Unit) {
         try {
-            val output = tlsSocket.outputStream
-            val input = tlsSocket.inputStream
-            
-            val request = "GET / HTTP/1.1\r\n" +
-                    "Host: $sni\r\n" +
-                    "User-Agent: Mozilla/5.0 (compatible; whitelist-checker/1.0)\r\n" +
-                    "Accept: */*\r\n" +
-                    "Connection: close\r\n\r\n"
-            
-            output.write(request.toByteArray())
-            output.flush()
-            
-            val reader = input.bufferedReader()
-            val statusLine = reader.readLine()
-            if (statusLine != null) {
-                result.httpStatusLine = statusLine
-                val parts = statusLine.split(" ")
-                if (parts.size >= 2) {
-                    result.httpStatusCode = parts[1].toIntOrNull()
-                }
-                
-                var line: String?
-                while (reader.readLine().also { line = it } != null && line!!.isNotEmpty()) {
-                    val low = line!!.lowercase()
-                    if (low.startsWith("server:")) {
-                        result.httpServerHeader = line!!.substringAfter(":").trim()
-                    } else if (low.startsWith("location:")) {
-                        result.httpRedirectLocation = line!!.substringAfter(":").trim()
-                    }
-                }
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            })
+
+            val sslContext = SSLContext.getInstance(protocol)
+            sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+            val sslSocket = sslContext.socketFactory.createSocket() as SSLSocket
+            sslSocket.soTimeout = timeoutMs
+
+            val sslParams = sslSocket.sslParameters
+            sslParams.serverNames = listOf(SNIHostName(sni))
+            sslSocket.sslParameters = sslParams
+            sslSocket.enabledProtocols = arrayOf(protocol)
+
+            sslSocket.connect(InetSocketAddress(ip, 443), minOf(2500, timeoutMs))
+            sslSocket.startHandshake()
+            callback(true)
+            sslSocket.close()
+        } catch (e: Exception) {
+            callback(false)
+        }
+    }
+
+    private fun _checkH2Support(ip: String, sni: String, timeoutMs: Int, result: CheckResult) {
+        try {
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            })
+
+            val sslContext = SSLContext.getInstance("TLSv1.2")
+            sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+            val sslSocket = sslContext.socketFactory.createSocket() as SSLSocket
+            sslSocket.soTimeout = timeoutMs
+
+            val sslParams = sslSocket.sslParameters
+            sslParams.serverNames = listOf(SNIHostName(sni))
+
+            try { sslParams.applicationProtocols = arrayOf("h2", "http/1.1") } catch (e: Exception) {}
+
+            sslSocket.sslParameters = sslParams
+            sslSocket.enabledProtocols = arrayOf("TLSv1.2", "TLSv1.3")
+
+            sslSocket.connect(InetSocketAddress(ip, 443), minOf(2500, timeoutMs))
+            sslSocket.startHandshake()
+
+            val negotiated = try { sslParams.applicationProtocols?.firstOrNull() } catch (e: Exception) { null }
+            result.h2Supported = negotiated == "h2"
+            sslSocket.close()
+        } catch (e: Exception) {
+            result.h2Supported = false
+        }
+    }
+
+    /**
+     * Combined HTTP check: does a single connection, sends GET to capture status+headers,
+     * then immediately sends HEAD on the same connection. Much faster than two separate connections.
+     */
+    private fun _combinedHttpCheck(ip: String, sni: String, timeoutMs: Int, result: CheckResult) {
+        try {
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            })
+
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+            val sslSocket = sslContext.socketFactory.createSocket() as SSLSocket
+            sslSocket.soTimeout = timeoutMs
+
+            val sslParams = sslSocket.sslParameters
+            sslParams.serverNames = listOf(SNIHostName(sni))
+            sslSocket.sslParameters = sslParams
+            sslSocket.enabledProtocols = arrayOf("TLSv1.2", "TLSv1.3")
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try { sslParams.applicationProtocols = arrayOf("h2", "http/1.1") } catch (_: Exception) {}
             }
+
+            sslSocket.connect(InetSocketAddress(ip, 443), minOf(3000, timeoutMs))
+            sslSocket.startHandshake()
+
+            val out = sslSocket.outputStream
+            val inp = sslSocket.inputStream
+
+            // === First: GET ===
+            val getRequest = "GET / HTTP/1.1\r\n" +
+                    "Host: $sni\r\n" +
+                    "User-Agent: Mozilla/5.0 SNI-Pinger/1.0\r\n" +
+                    "Accept: */*\r\n" +
+                    "Connection: keep-alive\r\n\r\n"
+
+            out.write(getRequest.toByteArray())
+            out.flush()
+
+            val reader = inp.bufferedReader()
+            val getResponse = _readHttpHeaders(reader)
+            if (getResponse != null) {
+                result.httpStatusLine = getResponse.status
+                result.httpStatusCode = getResponse.code
+                result.httpServerHeader = getResponse.headers["server"]
+                result.httpRedirectLocation = getResponse.headers["location"]
+                result.httpOk = true
+
+                // Consume body if present to keep connection alive for HEAD
+                getResponse.contentLength?.let { length ->
+                    // Read exactly content-length bytes (or up to 64KB for safety)
+                    val buf = ByteArray(minOf(length.toInt(), 65536))
+                    var totalRead = 0
+                    while (totalRead < length) {
+                        val read = inp.read(buf, totalRead, minOf(buf.size - totalRead, (length - totalRead).toInt()))
+                        if (read <= 0) break
+                        totalRead += read
+                    }
+                } ?: run {
+                    // No content-length: try to read chunked or just wait a brief moment
+                    // For safety, skip body reading on non-chunked
+                    Thread.sleep(100)
+                }
+
+                // === Second: HEAD (on same connection if possible) ===
+                val headRequest = "HEAD / HTTP/1.1\r\n" +
+                        "Host: $sni\r\n" +
+                        "User-Agent: Mozilla/5.0 SNI-Pinger/1.0\r\n" +
+                        "Connection: close\r\n\r\n"
+
+                out.write(headRequest.toByteArray())
+                out.flush()
+
+                val headResponse = _readHttpHeaders(reader)
+                result.httpHeadOk = headResponse != null
+            }
+
+            sslSocket.close()
         } catch (e: Exception) {
             result.errors.add("http: ${e.message}")
         }
     }
 
+    private data class HttpResponse(val status: String, val code: Int?, val headers: Map<String, String>, val contentLength: Long?)
+
+    private fun _readHttpHeaders(reader: java.io.BufferedReader): HttpResponse? {
+        val statusLine = reader.readLine() ?: return null
+        val parts = statusLine.split(" ")
+        val code = if (parts.size >= 2) parts[1].toIntOrNull() else null
+
+        val headers = mutableMapOf<String, String>()
+        var line: String?
+        while (reader.readLine().also { line = it } != null && line!!.isNotEmpty()) {
+            val colonIdx = line!!.indexOf(':')
+            if (colonIdx > 0) {
+                val key = line!!.substring(0, colonIdx).trim().lowercase()
+                val value = line!!.substring(colonIdx + 1).trim()
+                headers[key] = value
+            }
+        }
+
+        val contentLength = headers["content-length"]?.toLongOrNull()
+        return HttpResponse(statusLine, code, headers, contentLength)
+    }
+
+    // ===== Verdict =====
     private fun _makeVerdict(r: CheckResult) {
         if (r.tcpReachable == false) {
             r.inWhitelist = false
-            r.verdict = "❌ НЕ В БЕЛОМ СПИСКЕ — TCP заблокирован ТСПУ"
+            r.verdict = "❌ НЕ В БЕЛОМ СПИСКЕ — TCP заблокирован"
         } else if (r.tcpReachable == true && r.tlsOk == false) {
             r.inWhitelist = null
-            r.verdict = "⚠️ НЕОДНОЗНАЧНО — TCP проходит, TLS не удался (порт закрыт или DPI на уровне TLS)"
+            r.verdict = "⚠️ НЕОДНОЗНАЧНО — TCP проходит, TLS нет (возможно DPI)"
         } else if (r.tlsOk == true && r.httpStatusCode != null) {
             r.inWhitelist = true
             r.verdict = "✅ В БЕЛОМ СПИСКЕ — TCP + TLS + HTTP работают"
