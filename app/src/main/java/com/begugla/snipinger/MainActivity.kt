@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity() {
         sectionDns = findViewById(R.id.sectionDns)
         
         val sectionGeoView = layoutInflater.inflate(R.layout.item_result_section, layoutResults, false)
-        (layoutResults as LinearLayout).addView(sectionGeoView, 0)
+        layoutResults.addView(sectionGeoView, 0)
         sectionGeo = sectionGeoView
         
         cardRawOutput = findViewById(R.id.cardRawOutput)
@@ -314,8 +314,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun onCheckFinished() {
         runOnUiThread {
-            btnCheck.text = "Проверить"; controlButtons.visibility = View.GONE; cardProgress.visibility = View.GONE
-            isPaused = false; checkJob = null
+            btnCheck.text = "Проверить"
+            controlButtons.visibility = View.GONE
+            cardProgress.visibility = View.GONE
+            isPaused = false
+            checkJob = null
         }
     }
 
@@ -437,9 +440,6 @@ class MainActivity : AppCompatActivity() {
         cardVerdict.visibility = View.VISIBLE
     }
 
-    /**
-     * FULL VISUAL DISPLAY — MAPS ALL FIELDS FROM RAW OUTPUT
-     */
     private fun displayResult(r: CheckResult) {
         layoutResults.visibility = View.VISIBLE
         listOf(sectionTcp, sectionTls, sectionHttp, sectionDns, sectionGeo).forEach { 
@@ -450,15 +450,13 @@ class MainActivity : AppCompatActivity() {
         showVerdict(r.verdict, String.format(Locale.US, "Total time: %.2fs", r.totalTime),
             when (r.inWhitelist) { true -> R.color.status_ok; false -> R.color.status_error; null -> R.color.status_warning })
 
-        // ═══════════════════════════════════════════════════════════════
-        // 🌍 GEO IP + OWNERSHIP
-        // ═══════════════════════════════════════════════════════════════
         val geo = r.ipGeoInfo
         if (geo != null) {
+            addRow(sectionGeo, "📡 Geo Source", geo.source)
             addRow(sectionGeo, "🏢 Organization", geo.org)
             addRow(sectionGeo, "🔢 ASN", geo.asn)
             addRow(sectionGeo, "🏷️ Hostname", geo.hostname)
-            addRow(sectionGeo, "📍 IP (Geo)", geo.ip) // IP from ipinfo
+            addRow(sectionGeo, "📍 IP (Geo)", geo.ip)
             addRow(sectionGeo, "🏙️ City", geo.city)
             addRow(sectionGeo, "🗺️ Region", geo.region)
             addRow(sectionGeo, "🏳️ Country", geo.country)
@@ -467,15 +465,12 @@ class MainActivity : AppCompatActivity() {
             addRow(sectionGeo, "🕐 Timezone", geo.timezone)
             addRow(sectionGeo, "📡 Anycast", if (geo.anycast == true) "✅ Yes" else "❌ No")
         } else {
-            addRow(sectionGeo, "🌍 Geo Info", "N/A (ipinfo.io failed)")
+            addRow(sectionGeo, "🌍 Geo Info", "N/A (all providers failed)")
         }
         
         if (r.domainOwnerOrg != null) addRow(sectionGeo, "🔗 SNI Owner", r.domainOwnerOrg)
         if (r.domainResolvedIps.isNotEmpty()) addRow(sectionGeo, "🌐 Domain IPs", r.domainResolvedIps.joinToString(", "))
 
-        // ═══════════════════════════════════════════════════════════════
-        // 🔌 TCP / NETWORK
-        // ═══════════════════════════════════════════════════════════════
         addRow(sectionTcp, "🔌 Port 443 (TCP)", if (r.tcpReachable == true) "✅ Reachable" else "❌ Blocked", r.tcpReachable == false)
         addRow(sectionTcp, "  ⏱️ Connect Time", r.tcpConnectTime?.let { String.format(Locale.US, "%.3f s", it) })
         addRow(sectionTcp, "  📶 RTT (Ping)", r.rttMs?.let { String.format(Locale.US, "%.0f ms", it) })
@@ -488,9 +483,6 @@ class MainActivity : AppCompatActivity() {
         addRow(sectionTcp, "🔌 Port 53 (DNS)", if (r.tcp53Reachable == true) "✅ Open" else "❌ Closed", r.tcp53Reachable == false)
         addRow(sectionTcp, "🔌 Port 8080 (Proxy)", if (r.tcp8080Reachable == true) "✅ Open" else "❌ Closed", r.tcp8080Reachable == false)
 
-        // ═══════════════════════════════════════════════════════════════
-        // 🔒 TLS / CERTIFICATES
-        // ═══════════════════════════════════════════════════════════════
         addRow(sectionTls, "🔒 TLS Handshake", if (r.tlsOk == true) "✅ Success" else "❌ Failed", r.tlsOk == false)
         addRow(sectionTls, "  ⏱️ Handshake Time", r.tlsTime?.let { String.format(Locale.US, "%.3f s", it) })
         addRow(sectionTls, "  📋 Protocol Version", r.tlsVersion)
@@ -517,9 +509,6 @@ class MainActivity : AppCompatActivity() {
             addRow(sectionTls, "📜 SANs (${r.certSanList.size})", displaySans)
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // 🌐 HTTP (GET + HEAD)
-        // ═══════════════════════════════════════════════════════════════
         addRow(sectionHttp, "📤 HTTP GET", if (r.httpOk == true) "✅ OK" else "❌ Failed", r.httpOk == false)
         addRow(sectionHttp, "  ⏱️ GET Time", r.httpTime?.let { String.format(Locale.US, "%.3f s", it) })
         
@@ -531,9 +520,6 @@ class MainActivity : AppCompatActivity() {
         addRow(sectionHttp, "↪️ Redirect", r.httpRedirectLocation)
         if (r.httpRobotsTxt != null) addRow(sectionHttp, "🤖 robots.txt", r.httpRobotsTxt)
 
-        // ═══════════════════════════════════════════════════════════════
-        // 🎯 IP / DNS / PING
-        // ═══════════════════════════════════════════════════════════════
         addRow(sectionDns, "💻 Target (IP/Host)", r.ip)
         addRow(sectionDns, " 🌐 Target SNI", r.sni)
         addRow(sectionDns, "  📡 IP Version", "IPv${r.ipVersion}")
@@ -548,20 +534,13 @@ class MainActivity : AppCompatActivity() {
         if (r.dnsResolvesTo.isNotEmpty()) addRow(sectionDns, "🌐 Resolves To", r.dnsResolvesTo.joinToString(", "))
         addRow(sectionDns, "✅ IP matches DNS", if (r.ipMatchesDns == true) "✅ Yes" else "❌ No", r.ipMatchesDns == false)
 
-        // ICMP (Optional)
         if (r.icmpPing != null) addRow(sectionDns, "📶 ICMP Ping", "${r.icmpPing}ms")
-        if (r.icmpLoss != null) addRow(sectionDns, "   Packet Loss", "${r.icmpLoss}%")
+        if (r.icmpLoss != null) addRow(sectionDns, "  📦 Packet Loss", "${r.icmpLoss}%")
 
-        // ═══════════════════════════════════════════════════════════════
-        // ⚠️ ERRORS
-        // ═══════════════════════════════════════════════════════════════
         if (r.errors.isNotEmpty()) {
             r.errors.forEach { addRow(sectionTcp, "⚠️ Error", it, true) }
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // 📄 RAW OUTPUT
-        // ═══════════════════════════════════════════════════════════════
         cardRawOutput.visibility = View.VISIBLE
         tvRawOutput.text = r.toString().replace(", ", ",\n")
     }
