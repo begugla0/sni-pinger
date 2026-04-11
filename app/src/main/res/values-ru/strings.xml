@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">SNI PINGER</string>
+    <string name="mode_single">Свой</string>
+    <string name="mode_whitelist">White...</string>
+    <string name="mode_massive">Масс...</string>
+    <string name="ip_address">IP адрес</string>
+    <string name="sni_host">SNI хост</string>
+    <string name="sni_list_hint">Список SNI (каждый с новой строки)</string>
+    <string name="btn_check">Проверить</string>
+    <string name="btn_checking">Проверка...</string>
+    <string name="btn_pause">Пауза</string>
+    <string name="btn_resume">Продолжить</string>
+    <string name="btn_cancel">Отмена</string>
+    <string name="btn_copy_all">Копировать всё</string>
+    <string name="btn_copy">Копировать</string>
+    <string name="low_ping_filter">≤100мс</string>
+    <string name="terminal_title">ТЕРМИНАЛ</string>
+    <string name="raw_data">Сырые данные</string>
+    <string name="copy_success">Скопировано в буфер!</string>
+    <string name="error_loading_whitelist">Ошибка загрузки списка</string>
+    <string name="check_complete">Проверка завершена</string>
+    <string name="waiting_resume">Ожидание возоновления...</string>
+    <string name="loading_whitelist">Загрузка списка...</string>
+    <string name="total_time">Общее время: %1$.2fс</string>
+
+    <string name="verdict_ok_full">✅ В БЕЛОМ СПИСКЕ — TCP + TLS + HTTP ОК</string>
+    <string name="verdict_ok_tls">✅ ВЕРОЯТНО В БЕЛОМ СПИСКЕ — TCP + TLS ОК</string>
+    <string name="verdict_blocked_tcp">❌ ЗАБЛОКИРОВАН — Ошибка TCP</string>
+    <string name="verdict_uncertain_dpi">⚠️ НЕОПРЕДЕЛЕНО — TCP ОК, TLS Ошибка (DPI?)</string>
+    <string name="verdict_uncertain_data">⚠️ НЕОПРЕДЕЛЕНО — Недостаточно данных</string>
+
+    <string name="time_elapsed">Прошло: %1$02d:%2$02d</string>
+    <string name="time_remaining">Осталось: ~%1$02d:%2$02d</string>
+    <string name="select_language">Выберите язык</string>
+    <string name="lang_downloading">Загрузка языкового пакета...</string>
+</resources>

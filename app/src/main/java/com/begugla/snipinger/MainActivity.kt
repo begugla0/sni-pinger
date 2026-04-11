@@ -5,75 +5,49 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
-import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.view.animation.AnticipateOvershootInterpolator
 import android.widget.Button
-import android.widget.ImageButton
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
-import androidx.core.widget.NestedScrollView
-import com.google.android.material.button.MaterialButtonToggleGroup
-import com.google.android.material.card.MaterialCardView
-import com.google.android.material.checkbox.MaterialCheckBox
-import com.google.android.material.textfield.TextInputEditText
+import androidx.core.os.LocaleListCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
+import androidx.core.view.updatePadding
+import androidx.transition.AutoTransition
+import androidx.transition.TransitionManager
+import com.begugla.snipinger.databinding.ActivityMainBinding
+import com.begugla.snipinger.databinding.ItemResultRowBinding
+import com.begugla.snipinger.databinding.ItemResultSectionBinding
 import com.google.android.material.textfield.TextInputLayout
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.Translation
+import com.google.mlkit.nl.translate.Translator
+import com.google.mlkit.nl.translate.TranslatorOptions
 import kotlinx.coroutines.*
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class CheckMode { SINGLE, WHITELIST, MASSIVE }
-
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var binding: ActivityMainBinding
     private lateinit var prefs: SharedPreferences
-
-    private lateinit var tilSni: TextInputLayout
-    private lateinit var etIp: TextInputEditText
-    private lateinit var etSni: TextInputEditText
-    private lateinit var tilSniList: TextInputLayout
-    private lateinit var etSniList: TextInputEditText
-    private lateinit var btnCheck: Button
-    private lateinit var progressBar: ProgressBar
-    private lateinit var tvProgress: TextView
-    private lateinit var tvProgressCount: TextView
-    private lateinit var cardProgress: MaterialCardView
-    private lateinit var toggleGroup: MaterialButtonToggleGroup
-    private lateinit var controlButtons: LinearLayout
-    private lateinit var btnPause: ImageButton
-    private lateinit var btnCancel: ImageButton
-    private lateinit var listControls: LinearLayout
-    private lateinit var chkLowPing: MaterialCheckBox
-    private lateinit var btnCopyAll: Button
-
-    private lateinit var cardVerdict: MaterialCardView
-    private lateinit var tvVerdictIcon: TextView
-    private lateinit var tvVerdict: TextView
-    private lateinit var tvTotalTime: TextView
-    private lateinit var layoutResults: LinearLayout
-    private lateinit var sectionTcp: View
-    private lateinit var sectionTls: View
-    private lateinit var sectionHttp: View
-    private lateinit var sectionDns: View
-    private lateinit var sectionGeo: View
-    private lateinit var cardRawOutput: MaterialCardView
-    private lateinit var tvRawOutput: TextView
-    private lateinit var btnCopyRaw: Button
-
-    private lateinit var cardTerminal: MaterialCardView
-    private lateinit var tvTerminal: TextView
-    private lateinit var btnToggleTerminal: ImageButton
-    private val terminalLog = StringBuilder()
-    private var terminalExpanded = true
-
+    
     private val checker = WhitelistChecker()
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var checkJob: Job? = null
+    private var timerJob: Job? = null
+    
     private var isPaused = false
     private var isCancelled = false
 
@@ -81,525 +55,525 @@ class MainActivity : AppCompatActivity() {
     private val whitelistUrl = "https://raw.githubusercontent.com/hxehex/russia-mobile-internet-whitelist/refs/heads/main/whitelist.txt"
     private var allResults: List<CheckResult> = emptyList()
 
+    private var startTimeMillis: Long = 0
+    private var totalItemsCount = 0
+    private var processedItemsCount = 0
+
+    private var uiTranslator: Translator? = null
+    private var isTranslatorReady = false
+
     companion object {
-        private const val LOW_PING_THRESHOLD = 100
+        private const val LOW_PING_THRESHOLD = 150
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
+        
         prefs = getSharedPreferences("snipinger_prefs", Context.MODE_PRIVATE)
-
-        tilSni = findViewById(R.id.tilSni)
-        etIp = findViewById(R.id.etIp)
-        etSni = findViewById(R.id.etSni)
-        tilSniList = findViewById(R.id.tilSniList)
-        etSniList = findViewById(R.id.etSniList)
-        btnCheck = findViewById(R.id.btnCheck)
-        progressBar = findViewById(R.id.progressBar)
-        tvProgress = findViewById(R.id.tvProgress)
-        tvProgressCount = findViewById(R.id.tvProgressCount)
-        cardProgress = findViewById(R.id.cardProgress)
-        toggleGroup = findViewById(R.id.toggleGroup)
-        controlButtons = findViewById(R.id.controlButtons)
-        btnPause = findViewById(R.id.btnPause)
-        btnCancel = findViewById(R.id.btnCancel)
-        listControls = findViewById(R.id.listControls)
-        chkLowPing = findViewById(R.id.chkLowPing)
-        btnCopyAll = findViewById(R.id.btnCopyAll)
-
-        cardVerdict = findViewById(R.id.cardVerdict)
-        tvVerdictIcon = findViewById(R.id.tvVerdictIcon)
-        tvVerdict = findViewById(R.id.tvVerdict)
-        tvTotalTime = findViewById(R.id.tvTotalTime)
-        layoutResults = findViewById(R.id.layoutResults)
-        sectionTcp = findViewById(R.id.sectionTcp)
-        sectionTls = findViewById(R.id.sectionTls)
-        sectionHttp = findViewById(R.id.sectionHttp)
-        sectionDns = findViewById(R.id.sectionDns)
         
-        val sectionGeoView = layoutInflater.inflate(R.layout.item_result_section, layoutResults, false)
-        layoutResults.addView(sectionGeoView, 0)
-        sectionGeo = sectionGeoView
-        
-        cardRawOutput = findViewById(R.id.cardRawOutput)
-        tvRawOutput = findViewById(R.id.tvRawOutput)
-        btnCopyRaw = findViewById(R.id.btnCopyRaw)
-
-        cardTerminal = findViewById(R.id.cardTerminal)
-        tvTerminal = findViewById(R.id.tvTerminal)
-        btnToggleTerminal = findViewById(R.id.btnToggleTerminal)
-
-        setupSection(sectionTcp, "🔌 TCP / Network")
-        setupSection(sectionTls, "🔒 TLS / Certificates")
-        setupSection(sectionHttp, "🌐 HTTP")
-        setupSection(sectionDns, "🎯 IP / DNS")
-        setupSection(sectionGeo, "🌍 Geo / Ownership")
-
-        etIp.setText(prefs.getString("last_ip", "1.1.1.1"))
-        etSni.setText(prefs.getString("last_sni", "vk.com"))
-        etSniList.setText(prefs.getString("last_sni_list", "vk.com\nyandex.ru\ngoogle.com"))
-
-        val savedMode = prefs.getString("last_mode", "single") ?: "single"
-        val savedModeEnum = CheckMode.entries.find { it.name.lowercase() == savedMode } ?: CheckMode.SINGLE
-        currentMode = savedModeEnum
-        when (currentMode) {
-            CheckMode.SINGLE -> toggleGroup.check(R.id.btnModeSingle)
-            CheckMode.WHITELIST -> toggleGroup.check(R.id.btnModeWhitelist)
-            CheckMode.MASSIVE -> toggleGroup.check(R.id.btnModeMassive)
+        // Manual check/apply for appcompat:1.7.1 stability
+        val savedLang = prefs.getString("app_lang", "") ?: ""
+        if (savedLang.isNotEmpty()) {
+            val appLocales = LocaleListCompat.forLanguageTags(savedLang)
+            if (AppCompatDelegate.getApplicationLocales().isEmpty) {
+                AppCompatDelegate.setApplicationLocales(appLocales)
+            }
         }
-        updateModeUI(currentMode)
+        
+        applyTheme()
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+        setupWindowInsets()
+        setupUI()
+        loadSavedState()
+        
+        val currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags().ifEmpty { savedLang }
+        if (currentLang.isNotEmpty()) initTranslator(currentLang)
+    }
+
+    private fun setupWindowInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { _, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            binding.appBarLayout.updatePadding(top = systemBars.top)
+            binding.cardTerminal.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                bottomMargin = systemBars.bottom + 8.toPx()
+            }
+            binding.mainScrollView.updatePadding(bottom = systemBars.bottom + 220.toPx())
+            insets
+        }
+    }
+
+    private fun applyTheme() {
+        val theme = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        AppCompatDelegate.setDefaultNightMode(theme)
+    }
+
+    private fun setupUI() {
+        binding.btnThemeToggle.setOnClickListener {
+            val current = AppCompatDelegate.getDefaultNightMode()
+            val next = if (current == AppCompatDelegate.MODE_NIGHT_YES) 
+                AppCompatDelegate.MODE_NIGHT_NO else AppCompatDelegate.MODE_NIGHT_YES
+            
+            prefs.edit().putInt("theme_mode", next).apply()
+            binding.btnThemeToggle.animate().rotationBy(360f).setDuration(500).start()
+            AppCompatDelegate.setDefaultNightMode(next)
+        }
+
+        binding.btnLangToggle.setOnClickListener {
+            showLanguageDialog()
+        }
+
+        binding.toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
+            
+            TransitionManager.beginDelayedTransition(binding.root, AutoTransition().apply {
+                duration = 300
+                interpolator = AnticipateOvershootInterpolator()
+            })
+            
             currentMode = when (checkedId) {
                 R.id.btnModeWhitelist -> CheckMode.WHITELIST
                 R.id.btnModeMassive -> CheckMode.MASSIVE
                 else -> CheckMode.SINGLE
             }
             prefs.edit().putString("last_mode", currentMode.name.lowercase()).apply()
-            updateModeUI(currentMode)
+            
+            clearResults()
+            updateModeUI()
         }
 
-        btnCheck.setOnClickListener {
+        binding.btnToggleTerminal.setOnClickListener {
+            val isCurrentlyVisible = binding.terminalScrollView.visibility == View.VISIBLE
+            TransitionManager.beginDelayedTransition(binding.cardTerminal, AutoTransition())
+            binding.terminalScrollView.visibility = if (isCurrentlyVisible) View.GONE else View.VISIBLE
+            binding.cardTerminal.layoutParams.height = if (isCurrentlyVisible) 60.toPx() else 200.toPx()
+            binding.btnToggleTerminal.setImageResource(if (isCurrentlyVisible) android.R.drawable.arrow_up_float else android.R.drawable.arrow_down_float)
+            binding.cardTerminal.requestLayout()
+        }
+
+        binding.btnCheck.setOnClickListener {
             if (isPaused) resumeCheck()
             else if (checkJob?.isActive == true) pauseCheck()
             else performCheck()
         }
 
-        btnPause.setOnClickListener { if (isPaused) resumeCheck() else pauseCheck() }
-        btnCancel.setOnClickListener { cancelCheck() }
-        btnCopyRaw.setOnClickListener { copyToClipboard(tvRawOutput.text.toString()) }
+        binding.btnPause.setOnClickListener { if (isPaused) resumeCheck() else pauseCheck() }
+        binding.btnCancel.setOnClickListener { cancelCheck() }
+        binding.btnCopyRaw.setOnClickListener { copyToClipboard(binding.tvRawOutput.text.toString()) }
+        binding.btnCopyAll.setOnClickListener { copyToClipboard(buildMassiveResultText(allResults)) }
 
-        btnCopyAll.setOnClickListener {
-            val text = when (currentMode) {
-                CheckMode.MASSIVE -> buildMassiveResultText(allResults)
-                else -> buildFullResultText(allResults)
-            }
-            copyToClipboard(text)
-        }
-
-        chkLowPing.setOnCheckedChangeListener { _, _ ->
+        binding.chkLowPing.setOnCheckedChangeListener { _, _ ->
             if (currentMode != CheckMode.SINGLE && allResults.isNotEmpty()) {
-                displayListSummary(allResults, etIp.text.toString().trim())
+                displayListSummary(allResults, binding.etIp.text.toString().trim())
             }
         }
+    }
 
-        btnToggleTerminal.setOnClickListener {
-            terminalExpanded = !terminalExpanded
-            cardTerminal.layoutParams.height = if (terminalExpanded) 180 else 60
-            btnToggleTerminal.setImageResource(
-                if (terminalExpanded) android.R.drawable.arrow_down_float else android.R.drawable.arrow_up_float
-            )
-            cardTerminal.requestLayout()
+    private fun initTranslator(targetLang: String) {
+        val normalizedLang = targetLang.split("-")[0]
+        if (normalizedLang == "en" || normalizedLang == "ru") {
+            isTranslatorReady = false
+            return
+        }
+
+        val options = TranslatorOptions.Builder()
+            .setSourceLanguage(TranslateLanguage.ENGLISH)
+            .setTargetLanguage(normalizedLang)
+            .build()
+        uiTranslator = Translation.getClient(options)
+        
+        binding.loadingIndicator.visibility = View.VISIBLE
+        val conditions = DownloadConditions.Builder().requireWifi().build()
+        uiTranslator?.downloadModelIfNeeded(conditions)
+            ?.addOnSuccessListener { 
+                isTranslatorReady = true
+                binding.loadingIndicator.visibility = View.GONE
+                translateUI()
+            }
+            ?.addOnFailureListener {
+                binding.loadingIndicator.visibility = View.GONE
+            }
+    }
+
+    private fun translateUI() {
+        if (!isTranslatorReady || uiTranslator == null) return
+
+        translateAndSet(binding.btnCheck, getString(R.string.btn_check))
+        translateAndSet(binding.btnModeSingle, getString(R.string.mode_single))
+        translateAndSet(binding.btnModeWhitelist, getString(R.string.mode_whitelist))
+        translateAndSet(binding.btnModeMassive, getString(R.string.mode_massive))
+        
+        translateHint(binding.tilIp, getString(R.string.ip_address))
+        translateHint(binding.tilSni, getString(R.string.sni_host))
+        translateHint(binding.tilSniList, getString(R.string.sni_list_hint))
+        
+        translateAndSet(binding.chkLowPing, getString(R.string.low_ping_filter))
+        translateAndSet(binding.btnCopyAll, getString(R.string.btn_copy_all))
+    }
+
+    private fun showLanguageDialog() {
+        val languages = TranslateLanguage.getAllLanguages().sortedBy { Locale(it).getDisplayLanguage(Locale.getDefault()) }
+        val displayNames = languages.map { Locale(it).getDisplayLanguage(Locale.getDefault()).replaceFirstChar { it.uppercase() } }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.select_language)
+            .setItems(displayNames) { _, which ->
+                val selectedLang = languages[which]
+                updateLocale(selectedLang)
+            }
+            .show()
+    }
+
+    private fun updateModeUI() {
+        binding.tilSni.visibility = if (currentMode == CheckMode.SINGLE) View.VISIBLE else View.GONE
+        binding.tilSniList.visibility = if (currentMode == CheckMode.MASSIVE) View.VISIBLE else View.GONE
+        binding.listControls.visibility = if (currentMode != CheckMode.SINGLE) View.VISIBLE else View.GONE
+    }
+
+    private fun loadSavedState() {
+        binding.etIp.setText(prefs.getString("last_ip", "1.1.1.1"))
+        binding.etSni.setText(prefs.getString("last_sni", "vk.com"))
+        binding.etSniList.setText(prefs.getString("last_sni_list", "google.com\nyoutube.com\nfacebook.com"))
+        
+        val lastMode = prefs.getString("last_mode", "single")
+        when (lastMode) {
+            "whitelist" -> binding.toggleGroup.check(R.id.btnModeWhitelist)
+            "massive" -> binding.toggleGroup.check(R.id.btnModeMassive)
+            else -> binding.toggleGroup.check(R.id.btnModeSingle)
+        }
+        updateModeUI()
+    }
+
+    private fun updateLocale(langCode: String) {
+        prefs.edit().putString("app_lang", langCode).apply()
+        val appLocales = LocaleListCompat.forLanguageTags(langCode)
+        AppCompatDelegate.setApplicationLocales(appLocales)
+        
+        // Final effort to ensure stability: small delay before recreation
+        scope.launch {
+            delay(150)
+            recreate()
         }
     }
 
-    private fun updateModeUI(mode: CheckMode) {
-        tilSni.visibility = if (mode == CheckMode.SINGLE) View.VISIBLE else View.GONE
-        tilSniList.visibility = if (mode == CheckMode.MASSIVE) View.VISIBLE else View.GONE
-        listControls.visibility = if (mode != CheckMode.SINGLE) View.VISIBLE else View.GONE
-        btnCopyAll.visibility = View.GONE
-        terminalLog.clear()
-        tvTerminal.text = ""
+    private fun translateAndSet(view: View, text: String) {
+        if (isTranslatorReady && uiTranslator != null) {
+            uiTranslator?.translate(text)?.addOnSuccessListener { translated ->
+                try {
+                    when (view) {
+                        is TextView -> view.text = translated
+                        is Button -> view.text = translated
+                    }
+                } catch (e: Exception) {}
+            }
+        }
     }
 
-    private fun setupSection(view: View, title: String) {
-        view.findViewById<TextView>(R.id.tvSectionTitle).text = title
+    private fun translateHint(til: TextInputLayout, text: String) {
+        if (isTranslatorReady && uiTranslator != null) {
+            uiTranslator?.translate(text)?.addOnSuccessListener { translated ->
+                try { til.hint = translated } catch (e: Exception) {}
+            }
+        }
     }
 
-    private fun addRow(section: View, label: String, value: Any?, isError: Boolean = false) {
+    private fun addRow(sectionBinding: ItemResultSectionBinding, label: String, value: Any?, isError: Boolean = false) {
         if (value == null) return
-        val container = section.findViewById<LinearLayout>(R.id.containerRows)
-        val rowView = LayoutInflater.from(this).inflate(R.layout.item_result_row, container, false)
-        rowView.findViewById<TextView>(R.id.tvLabel).text = label
-        val tvValue = rowView.findViewById<TextView>(R.id.tvValue)
-        val displayValue = value.toString()
-        tvValue.text = displayValue
-        if (isError) {
-            tvValue.setTextColor(ContextCompat.getColor(this, R.color.status_error))
-        } else if (displayValue.contains("OK") || displayValue.contains("Доступен") || displayValue.contains("Да") || displayValue.contains("✅") || displayValue.contains("Open") || displayValue.contains("Reachable") || displayValue.contains("Success") || displayValue.contains("Supported") || displayValue.contains("Match") || displayValue.contains("Yes")) {
-            tvValue.setTextColor(ContextCompat.getColor(this, R.color.status_ok))
-        } else if (displayValue.contains("FAIL") || displayValue.contains("Нет") || displayValue.contains("❌") || displayValue.contains("BLOCKED") || displayValue.contains("Blocked") || displayValue.contains("Failed") || displayValue.contains("Closed") || displayValue.contains("Not supported")) {
-            tvValue.setTextColor(ContextCompat.getColor(this, R.color.status_error))
-        } else if (displayValue.contains("───") || displayValue.contains("N/A") || displayValue.contains("❓")) {
-            tvValue.setTextColor(ContextCompat.getColor(this, R.color.text_sub))
+        val container = sectionBinding.containerRows
+        val rowBinding = ItemResultRowBinding.inflate(layoutInflater, container, false)
+        
+        if (isTranslatorReady && uiTranslator != null) {
+            uiTranslator?.translate(label)?.addOnSuccessListener { 
+                try { rowBinding.tvLabel.text = it } catch (e: Exception) {}
+            }
+        } else {
+            rowBinding.tvLabel.text = label
         }
-        container.addView(rowView)
-        section.visibility = View.VISIBLE
+        
+        val valueStr = value.toString()
+        if (label == "City" || label == "Org" || label == "Status" || label == "Type" || label == "Verdict") {
+            if (isTranslatorReady && uiTranslator != null) {
+                uiTranslator?.translate(valueStr)?.addOnSuccessListener { 
+                    try { rowBinding.tvValue.text = it } catch (e: Exception) {}
+                }
+            } else {
+                rowBinding.tvValue.text = valueStr
+            }
+        } else {
+            rowBinding.tvValue.text = valueStr
+        }
+
+        if (isError) {
+            rowBinding.tvValue.setTextColor(ContextCompat.getColor(this, R.color.error))
+        } else if (valueStr.contains("OK") || valueStr.contains("✅") || valueStr.contains("CONNECTED") || valueStr.contains("Success") || valueStr.contains("Supported")) {
+            rowBinding.tvValue.setTextColor(ContextCompat.getColor(this, R.color.success))
+        }
+
+        container.addView(rowBinding.root)
+        sectionBinding.root.visibility = View.VISIBLE
     }
 
     private fun clearResults() {
-        listOf(sectionTcp, sectionTls, sectionHttp, sectionDns, sectionGeo).forEach {
-            it.findViewById<LinearLayout>(R.id.containerRows).removeAllViews()
-            it.visibility = View.GONE
+        listOf(binding.sectionTcp, binding.sectionTls, binding.sectionHttp, binding.sectionDns, binding.sectionGeo).forEach {
+            it.containerRows.removeAllViews()
+            it.root.visibility = View.GONE
         }
-        cardVerdict.visibility = View.GONE
-        layoutResults.visibility = View.GONE
-        cardRawOutput.visibility = View.GONE
+        binding.layoutResults.visibility = View.GONE
+        binding.cardVerdict.visibility = View.GONE
+        binding.cardRawOutput.visibility = View.GONE
+        binding.tvRawOutput.text = ""
         allResults = emptyList()
-        btnCopyAll.visibility = View.GONE
     }
 
     private fun performCheck() {
-        val ip = etIp.text.toString().trim()
-        prefs.edit().putString("last_ip", ip).apply()
-
-        val snis: List<String> = when (currentMode) {
-            CheckMode.SINGLE -> {
-                val sni = etSni.text.toString().trim()
-                if (sni.isEmpty()) return
-                prefs.edit().putString("last_sni", sni).apply()
-                listOf(sni)
-            }
-            CheckMode.WHITELIST -> emptyList()
-            CheckMode.MASSIVE -> {
-                val listText = etSniList.text.toString().trim()
-                if (listText.isEmpty()) return
-                prefs.edit().putString("last_sni_list", listText).apply()
-                listText.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
-            }
+        val host = binding.etIp.text.toString().trim()
+        if (host.isEmpty()) {
+            Toast.makeText(this, R.string.err_empty_ip, Toast.LENGTH_SHORT).show()
+            return
         }
 
-        btnCheck.text = "Проверка..."
-        cardProgress.visibility = View.VISIBLE
-        controlButtons.visibility = if (currentMode != CheckMode.SINGLE) View.VISIBLE else View.GONE
-        cardTerminal.visibility = if (currentMode != CheckMode.SINGLE) View.VISIBLE else View.GONE
-        btnPause.setImageResource(android.R.drawable.ic_media_pause)
-        isPaused = false
         isCancelled = false
+        isPaused = false
+        updateCheckButtonState(true)
         clearResults()
-        terminalLog.clear()
+        
+        startTimeMillis = System.currentTimeMillis()
+        processedItemsCount = 0
+        startTimer()
 
         checkJob = scope.launch {
             try {
-                if (currentMode == CheckMode.WHITELIST) {
-                    performWhitelistCheck(ip)
-                } else if (currentMode == CheckMode.MASSIVE) {
-                    performMassiveCheck(ip, snis)
-                } else {
-                    val sni = snis.first()
-                    val result = withContext(Dispatchers.IO) { checker.checkIp(ip, sni) }
-                    if (!isCancelled) displayResult(result)
+                when (currentMode) {
+                    CheckMode.SINGLE -> {
+                        val sni = binding.etSni.text.toString().trim()
+                        if (sni.isEmpty()) return@launch
+                        totalItemsCount = 1
+                        val result = withContext(Dispatchers.IO) { checker.checkIp(host, sni) }
+                        if (!isCancelled) displaySingleResult(result)
+                    }
+                    CheckMode.WHITELIST -> {
+                        val snis = fetchWhitelist()
+                        checkMultiple(host, snis)
+                    }
+                    CheckMode.MASSIVE -> {
+                        val snis = binding.etSniList.text.toString().split("\n")
+                            .map { it.trim() }.filter { it.isNotEmpty() }
+                        checkMultiple(host, snis)
+                    }
                 }
+            } catch (e: Exception) {
+                logToTerminal("Error: ${e.message}")
             } finally {
-                onCheckFinished()
+                stopTimer()
+                updateCheckButtonState(false)
             }
         }
     }
 
     private fun pauseCheck() {
         isPaused = true
-        btnCheck.text = "▶ Продолжить"
-        btnPause.setImageResource(android.R.drawable.ic_media_play)
-        appendToTerminal("[PAUSED]")
+        binding.btnCheck.text = getString(R.string.btn_resume)
+        binding.btnPause.setImageResource(android.R.drawable.ic_media_play)
+        logToTerminal("--- PAUSED ---")
     }
-    
+
     private fun resumeCheck() {
         isPaused = false
-        btnCheck.text = "⏸ Пауза"
-        btnPause.setImageResource(android.R.drawable.ic_media_pause)
-        appendToTerminal("[RESUMED]")
+        binding.btnCheck.text = getString(R.string.btn_pause)
+        binding.btnPause.setImageResource(android.R.drawable.ic_media_pause)
+        logToTerminal("--- RESUMED ---")
     }
-    
+
     private fun cancelCheck() {
         isCancelled = true
         checkJob?.cancel()
-        checkJob = null
-        isPaused = false
-        onCheckFinished()
-        appendToTerminal("[CANCELLED]")
+        stopTimer()
+        updateCheckButtonState(false)
+        logToTerminal("--- CANCELLED ---")
     }
 
-    private fun onCheckFinished() {
-        runOnUiThread {
-            btnCheck.text = "Проверить"
-            controlButtons.visibility = View.GONE
-            cardProgress.visibility = View.GONE
-            isPaused = false
-            checkJob = null
-        }
-    }
-
-    private suspend fun waitForResumeIfNeeded() {
-        while (isPaused) {
-            delay(200)
-            if (isCancelled) return
-        }
-    }
-
-    private suspend fun performWhitelistCheck(ip: String) {
-        val snis = withContext(Dispatchers.IO) {
-            try {
-                appendToTerminal("Loading whitelist...")
-                val text = URL(whitelistUrl).readText()
-                text.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
-            } catch (e: Exception) {
-                appendToTerminal("ERROR: ${e.message}")
-                emptyList()
-            }
-        }
-
-        if (snis.isEmpty() || isCancelled) {
-            if (!isCancelled) withContext(Dispatchers.Main) { showVerdict("Ошибка загрузки списка", "Проверьте подключение", R.color.status_error) }
-            return
-        }
+    private suspend fun checkMultiple(host: String, snis: List<String>) {
         val results = mutableListOf<CheckResult>()
-        val total = snis.size
-
-        snis.forEachIndexed { index, sni ->
-            if (isCancelled) return@forEachIndexed
-            waitForResumeIfNeeded()
-            if (isCancelled) return@forEachIndexed
-
-            withContext(Dispatchers.Main) {
-                tvProgress.text = sni
-                tvProgressCount.text = "${index + 1} / $total"
-                progressBar.max = total
-                progressBar.progress = index + 1
-            }
-            
-            val result = withContext(Dispatchers.IO) { checker.checkIp(ip, sni) }
-            results.add(result)
-            appendToTerminal(result.toTerminalLine())
-
-            withContext(Dispatchers.Main) {
-                allResults = results.toList()
-                displayListSummary(results, ip)
-                btnCopyAll.visibility = View.VISIBLE
-            }
-        }
-        if (!isCancelled) appendToTerminal("=== CHECK COMPLETE ===")
-    }
-
-    private suspend fun performMassiveCheck(ip: String, snis: List<String>) {
-        val results = mutableListOf<CheckResult>()
-        val total = snis.size
-        snis.forEachIndexed { index, sni ->
-            if (isCancelled) return@forEachIndexed
-            waitForResumeIfNeeded()
-            if (isCancelled) return@forEachIndexed
-
-            withContext(Dispatchers.Main) {
-                tvProgress.text = sni
-                tvProgressCount.text = "${index + 1} / $total"
-                progressBar.max = total
-                progressBar.progress = index + 1
-            }
-            
-            val result = withContext(Dispatchers.IO) { checker.checkIp(ip, sni) }
-            results.add(result)
-            appendToTerminal(result.toTerminalLine())
-
-            withContext(Dispatchers.Main) {
-                allResults = results.toList()
-                displayListSummary(results, ip)
-                btnCopyAll.visibility = View.VISIBLE
-            }
-        }
-        if (!isCancelled) appendToTerminal("=== MASSIVE CHECK COMPLETE ===")
-    }
-
-    private fun CheckResult.toTerminalLine(): String {
-        val status = when { tlsOk == true -> "OK"; tcpReachable == true -> "TLS_FAIL"; else -> "BLOCKED" }
-        val pingStr = rttMs?.let { "${it.toInt()}ms" } ?: "---"
-        val ts = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-        return "[$ts] [$status] $pingStr $sni"
-    }
-
-    private fun displayListSummary(results: List<CheckResult>, ip: String) {
-        layoutResults.visibility = View.VISIBLE
-        listOf(sectionTcp, sectionHttp, sectionDns, sectionGeo).forEach { it.visibility = View.GONE }
+        totalItemsCount = snis.size
         
-        val filterLowPing = chkLowPing.isChecked
-        val filteredResults = if (filterLowPing) results.filter { it.rttMs != null && it.rttMs!! <= LOW_PING_THRESHOLD } else results
-        val sortedResults = filteredResults.sortedWith(compareByDescending<CheckResult> { it.tlsOk == true }.thenByDescending { it.tcpReachable == true }.thenBy { it.rttMs ?: Double.MAX_VALUE })
+        for ((index, sni) in snis.withIndex()) {
+            while (isPaused) delay(500)
+            if (isCancelled) break
+            
+            processedItemsCount = index + 1
+            withContext(Dispatchers.Main) {
+                binding.tvProgress.text = sni
+                binding.tvProgressCount.text = "$processedItemsCount / $totalItemsCount"
+                binding.progressBar.max = totalItemsCount
+                binding.progressBar.progress = processedItemsCount
+            }
 
-        val workingCount = results.count { it.tlsOk == true }
-        val lowPingCount = results.count { it.rttMs != null && it.rttMs!! <= LOW_PING_THRESHOLD }
-        val pingFilterText = if (filterLowPing) " (<=${LOW_PING_THRESHOLD}ms: $lowPingCount)" else ""
-        val modeLabel = if (currentMode == CheckMode.MASSIVE) "SNI" else "SNI (whitelist)"
-        showVerdict("$workingCount / ${results.size} $modeLabel работают$pingFilterText", "IP: $ip", if (workingCount > 0) R.color.status_ok else R.color.status_error)
-
-        sectionTls.findViewById<LinearLayout>(R.id.containerRows).removeAllViews()
-        sortedResults.forEach { r ->
-            val status = when { r.tlsOk == true -> "OK"; r.tcpReachable == true -> "TLS_FAIL"; else -> "BLOCKED" }
-            val ping = r.rttMs?.let { "[${it.toInt()}ms]" } ?: "[---]"
-            addRow(sectionTls, r.sni, "$status $ping", r.tlsOk != true)
+            logToTerminal("Checking [$processedItemsCount/$totalItemsCount]: $sni...")
+            val result = withContext(Dispatchers.IO) { checker.checkIp(host, sni) }
+            results.add(result)
+            allResults = results.toList()
+            
+            withContext(Dispatchers.Main) {
+                displayListSummary(allResults, host)
+                binding.btnCopyAll.visibility = View.VISIBLE
+            }
+            
+            // Auto-scroll terminal
+            binding.terminalScrollView.post { binding.terminalScrollView.fullScroll(View.FOCUS_DOWN) }
         }
-        sectionTls.visibility = View.VISIBLE
-        setupSection(sectionTls, "Результаты SNI (отсортировано)")
-        scrollToBottom()
     }
 
-    private fun showVerdict(verdict: String, subtitle: String, colorRes: Int) {
-        tvVerdict.text = verdict
-        tvTotalTime.text = subtitle
-        cardVerdict.setCardBackgroundColor(ContextCompat.getColor(this, colorRes))
-        cardVerdict.visibility = View.VISIBLE
+    private suspend fun fetchWhitelist(): List<String> = withContext(Dispatchers.IO) {
+        try {
+            URL(whitelistUrl).readText().split("\n").map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
-    private fun displayResult(r: CheckResult) {
-        layoutResults.visibility = View.VISIBLE
-        listOf(sectionTcp, sectionTls, sectionHttp, sectionDns, sectionGeo).forEach { 
-            it.findViewById<LinearLayout>(R.id.containerRows).removeAllViews()
-            it.visibility = View.GONE 
-        }
-
+    private fun displaySingleResult(r: CheckResult) {
+        binding.layoutResults.visibility = View.VISIBLE
+        
         showVerdict(r.verdict, String.format(Locale.US, "Total time: %.2fs", r.totalTime),
-            when (r.inWhitelist) { true -> R.color.status_ok; false -> R.color.status_error; null -> R.color.status_warning })
+            when (r.inWhitelist) { 
+                true -> R.color.success
+                false -> R.color.error
+                null -> R.color.warning 
+            })
 
         val geo = r.ipGeoInfo
         if (geo != null) {
-            addRow(sectionGeo, "📡 Geo Source", geo.source)
-            addRow(sectionGeo, "🏢 Organization", geo.org)
-            addRow(sectionGeo, "🔢 ASN", geo.asn)
-            addRow(sectionGeo, "🏷️ Hostname", geo.hostname)
-            addRow(sectionGeo, "📍 IP (Geo)", geo.ip)
-            addRow(sectionGeo, "🏙️ City", geo.city)
-            addRow(sectionGeo, "🗺️ Region", geo.region)
-            addRow(sectionGeo, "🏳️ Country", geo.country)
-            addRow(sectionGeo, "🏳️ Country Code", geo.countryCode)
-            addRow(sectionGeo, "📮 Postal Code", geo.postalCode)
-            addRow(sectionGeo, "🕐 Timezone", geo.timezone)
-            addRow(sectionGeo, "📡 Anycast", if (geo.anycast == true) "✅ Yes" else "❌ No")
-        } else {
-            addRow(sectionGeo, "🌍 Geo Info", "N/A (all providers failed)")
+            addRow(binding.sectionGeo, "📡 Geo Source", geo.source)
+            addRow(binding.sectionGeo, "🏢 Organization", geo.org)
+            addRow(binding.sectionGeo, "🏙️ City", geo.city)
+            addRow(binding.sectionGeo, "🏳️ Country", geo.country)
         }
         
-        if (r.domainOwnerOrg != null) addRow(sectionGeo, "🔗 SNI Owner", r.domainOwnerOrg)
-        if (r.domainResolvedIps.isNotEmpty()) addRow(sectionGeo, "🌐 Domain IPs", r.domainResolvedIps.joinToString(", "))
+        addRow(binding.sectionTcp, "🔌 Port 443 (TCP)", if (r.tcpReachable == true) "✅ Reachable" else "❌ Blocked", r.tcpReachable == false)
+        addRow(binding.sectionTcp, "📶 RTT (Ping)", r.rttMs?.let { String.format(Locale.US, "%.0f ms", it) })
+        addRow(binding.sectionTcp, "🔌 Port 80 (HTTP)", if (r.tcp80Reachable == true) "✅ Open" else "❌ Closed", r.tcp80Reachable == false)
 
-        addRow(sectionTcp, "🔌 Port 443 (TCP)", if (r.tcpReachable == true) "✅ Reachable" else "❌ Blocked", r.tcpReachable == false)
-        addRow(sectionTcp, "  ⏱️ Connect Time", r.tcpConnectTime?.let { String.format(Locale.US, "%.3f s", it) })
-        addRow(sectionTcp, "  📶 RTT (Ping)", r.rttMs?.let { String.format(Locale.US, "%.0f ms", it) })
-        
-        addRow(sectionTcp, "────────────────", "─ ─ ─ ─ ─ ─ ─ ─")
-        
-        addRow(sectionTcp, "🔌 Port 80 (HTTP)", if (r.tcp80Reachable == true) "✅ Open" else "❌ Closed", r.tcp80Reachable == false)
-        addRow(sectionTcp, "  ⏱️ Connect Time", r.tcp80ConnectTime?.let { String.format(Locale.US, "%.3f s", it) })
-        
-        addRow(sectionTcp, "🔌 Port 53 (DNS)", if (r.tcp53Reachable == true) "✅ Open" else "❌ Closed", r.tcp53Reachable == false)
-        addRow(sectionTcp, "🔌 Port 8080 (Proxy)", if (r.tcp8080Reachable == true) "✅ Open" else "❌ Closed", r.tcp8080Reachable == false)
+        addRow(binding.sectionTls, "🔒 TLS Handshake", if (r.tlsOk == true) "✅ Success" else "❌ Failed", r.tlsOk == false)
+        addRow(binding.sectionTls, "📋 Protocol Version", r.tlsVersion)
+        addRow(binding.sectionTls, "🔐 Cipher Suite", r.tlsCipher)
+        addRow(binding.sectionTls, "🎯 SNI Match", if (r.certSniMatch == true) "✅ Yes" else "❌ No", r.certSniMatch == false)
+        addRow(binding.sectionTls, "⚡ HTTP/2", when(r.h2Supported) { true -> "✅ Yes"; false -> "❌ No"; else -> "❓ N/A" })
 
-        addRow(sectionTls, "🔒 TLS Handshake", if (r.tlsOk == true) "✅ Success" else "❌ Failed", r.tlsOk == false)
-        addRow(sectionTls, "  ⏱️ Handshake Time", r.tlsTime?.let { String.format(Locale.US, "%.3f s", it) })
-        addRow(sectionTls, "  📋 Protocol Version", r.tlsVersion)
-        addRow(sectionTls, "  🔐 Cipher Suite", r.tlsCipher)
-        
-        addRow(sectionTls, "────────────────", "─ ─ ─ ─ ─ ─ ─ ─")
-        
-        addRow(sectionTls, "TLS 1.2", if (r.tls12Ok == true) "✅ Supported" else "❌ Not supported", r.tls12Ok == false)
-        addRow(sectionTls, "TLS 1.3", if (r.tls13Ok == true) "✅ Supported" else "❌ Not supported", r.tls13Ok == false)
-        addRow(sectionTls, "⚡ HTTP/2 (ALPN)", when (r.h2Supported) { true -> "✅ Yes"; false -> "❌ No"; null -> "❓ N/A" })
-        
-        addRow(sectionTls, "────────────────", "─ ─ ─ ─ ─ ─ ─ ─")
-        
-        addRow(sectionTls, "🎯 SNI Match", if (r.certSniMatch == true) "✅ Yes" else "❌ No", r.certSniMatch == false)
-        addRow(sectionTls, "📋 Subject", r.certSubject)
-        addRow(sectionTls, "📝 Issuer", r.certIssuer)
-        addRow(sectionTls, "⏩ Valid From", r.certNotBefore)
-        addRow(sectionTls, "⏪ Valid Until", r.certNotAfter)
-        
-        if (r.certSanList.isNotEmpty()) {
-            val displaySans = if (r.certSanList.size > 10)
-                r.certSanList.take(10).joinToString(",\n") + "\n... (+${r.certSanList.size - 10} more)"
-            else r.certSanList.joinToString(",\n")
-            addRow(sectionTls, "📜 SANs (${r.certSanList.size})", displaySans)
-        }
+        if (r.httpStatusCode != null) addRow(binding.sectionHttp, "🔢 Status Code", r.httpStatusCode)
+        addRow(binding.sectionHttp, "🖥️ Server Header", r.httpServerHeader)
+        addRow(binding.sectionHttp, "↪️ Redirect", r.httpRedirectLocation)
 
-        addRow(sectionHttp, "📤 HTTP GET", if (r.httpOk == true) "✅ OK" else "❌ Failed", r.httpOk == false)
-        addRow(sectionHttp, "  ⏱️ GET Time", r.httpTime?.let { String.format(Locale.US, "%.3f s", it) })
-        
-        addRow(sectionHttp, "📥 HTTP HEAD", if (r.httpHeadOk == true) "✅ OK" else "❌ Failed", r.httpHeadOk == false)
-            
-        if (r.httpStatusCode != null) addRow(sectionHttp, "  🔢 Status Code", r.httpStatusCode)
-        if (r.httpStatusLine != null) addRow(sectionHttp, "  📜 Status Line", r.httpStatusLine)
-        addRow(sectionHttp, "🖥️ Server Header", r.httpServerHeader)
-        addRow(sectionHttp, "↪️ Redirect", r.httpRedirectLocation)
-        if (r.httpRobotsTxt != null) addRow(sectionHttp, "🤖 robots.txt", r.httpRobotsTxt)
+        addRow(binding.sectionDns, "💻 Target IP", r.ip)
+        addRow(binding.sectionDns, "🔍 DNS Resolve Time", r.dnsResolveTime?.let { String.format(Locale.US, "%.3f s", it) })
+        if (r.dnsResolvesTo.isNotEmpty()) addRow(binding.sectionDns, "🌐 Resolves To", r.dnsResolvesTo.joinToString(", "))
 
-        addRow(sectionDns, "💻 Target (IP/Host)", r.ip)
-        addRow(sectionDns, " 🌐 Target SNI", r.sni)
-        addRow(sectionDns, "  📡 IP Version", "IPv${r.ipVersion}")
-        addRow(sectionDns, "  🔒 Is Private", if (r.ipIsPrivate == true) "✅ Yes" else "❌ No")
-        addRow(sectionDns, "  🌐 Is Global", if (r.ipIsGlobal == true) "✅ Yes" else "❌ No")
-        addRow(sectionDns, "  📋 Port", r.port.toString())
-        addRow(sectionDns, "  ⏱️ Timeout", r.timeout.toString() + "s")
-        
-        addRow(sectionDns, "────────────────", "─ ─ ─ ─ ─ ─ ─ ─")
-        
-        addRow(sectionDns, "🔍 DNS Resolve Time", r.dnsResolveTime?.let { String.format(Locale.US, "%.3f s", it) })
-        if (r.dnsResolvesTo.isNotEmpty()) addRow(sectionDns, "🌐 Resolves To", r.dnsResolvesTo.joinToString(", "))
-        addRow(sectionDns, "✅ IP matches DNS", if (r.ipMatchesDns == true) "✅ Yes" else "❌ No", r.ipMatchesDns == false)
-
-        if (r.icmpPing != null) addRow(sectionDns, "📶 ICMP Ping", "${r.icmpPing}ms")
-        if (r.icmpLoss != null) addRow(sectionDns, "  📦 Packet Loss", "${r.icmpLoss}%")
-
-        if (r.errors.isNotEmpty()) {
-            r.errors.forEach { addRow(sectionTcp, "⚠️ Error", it, true) }
-        }
-
-        cardRawOutput.visibility = View.VISIBLE
-        tvRawOutput.text = r.toString().replace(", ", ",\n")
+        binding.cardRawOutput.visibility = View.VISIBLE
+        binding.tvRawOutput.text = r.toString().replace(", ", ",\n")
     }
 
-    private fun buildFullResultText(results: List<CheckResult>): String = buildString {
-        append("=== SNI Pinger ===\n")
-        append("IP: ${etIp.text}\n")
-        append("Total: ${results.size} | Working: ${results.count { it.tlsOk == true }}\n\n")
-        results.forEach { r ->
+    private fun displayListSummary(results: List<CheckResult>, host: String) {
+        binding.layoutResults.visibility = View.VISIBLE
+        listOf(binding.sectionTcp, binding.sectionHttp, binding.sectionDns, binding.sectionGeo).forEach { it.root.visibility = View.GONE }
+        
+        val filterLowPing = binding.chkLowPing.isChecked
+        val filtered = if (filterLowPing) results.filter { it.rttMs != null && it.rttMs!! <= LOW_PING_THRESHOLD } else results
+        val sorted = filtered.sortedWith(compareByDescending<CheckResult> { it.tlsOk == true }.thenBy { it.rttMs ?: Double.MAX_VALUE })
+        
+        val workingCount = results.count { it.tlsOk == true }
+        showVerdict("$workingCount / ${results.size} SNI working", "Host: $host", if (workingCount > 0) R.color.success else R.color.error)
+
+        val container = binding.sectionTls.containerRows
+        container.removeAllViews()
+        sorted.forEach { r ->
+            val row = ItemResultRowBinding.inflate(layoutInflater, container, false)
+            row.tvLabel.text = r.sni
             val status = when { r.tlsOk == true -> "OK"; r.tcpReachable == true -> "TLS_FAIL"; else -> "BLOCKED" }
-            append("--- ${r.sni} [$status] ---\n")
-            if (r.ipGeoInfo != null) append("Geo: ${r.ipGeoInfo?.org ?: "?"}, ${r.ipGeoInfo?.city}\n")
-            if (r.rttMs != null) append("Ping: ${r.rttMs?.toInt()}ms\n")
-            append("TLS: ${r.tlsOk}, Ver: ${r.tlsVersion}\n")
-            append("\n")
+            val ping = r.rttMs?.let { "[${it.toInt()}ms]" } ?: "[---]"
+            row.tvValue.text = "$status $ping"
+            if (r.tlsOk != true) row.tvValue.setTextColor(ContextCompat.getColor(this, R.color.error))
+            else row.tvValue.setTextColor(ContextCompat.getColor(this, R.color.success))
+            container.addView(row.root)
+        }
+        binding.sectionTls.root.visibility = View.VISIBLE
+    }
+
+    private fun showVerdict(verdict: String, subtitle: String, colorRes: Int) {
+        binding.tvVerdict.text = verdict
+        binding.tvTotalTime.text = subtitle
+        binding.cardVerdict.setCardBackgroundColor(ContextCompat.getColor(this, colorRes))
+        binding.cardVerdict.visibility = View.VISIBLE
+    }
+
+    private fun logToTerminal(msg: String) {
+        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+        binding.tvTerminal.append("[$time] $msg\n")
+    }
+
+    private fun updateCheckButtonState(running: Boolean) {
+        binding.btnCheck.text = if (running) getString(R.string.btn_pause) else getString(R.string.btn_check)
+        binding.cardProgress.visibility = if (running) View.VISIBLE else View.GONE
+        binding.btnPause.visibility = if (running) View.VISIBLE else View.GONE
+        binding.btnCancel.visibility = if (running) View.VISIBLE else View.GONE
+        binding.cardTerminal.visibility = if (running || currentMode != CheckMode.SINGLE) View.VISIBLE else View.GONE
+        
+        binding.etIp.isEnabled = !running
+        binding.etSni.isEnabled = !running
+        binding.etSniList.isEnabled = !running
+        binding.btnModeSingle.isEnabled = !running
+        binding.btnModeWhitelist.isEnabled = !running
+        binding.btnModeMassive.isEnabled = !running
+    }
+
+    private fun startTimer() {
+        timerJob = scope.launch {
+            while (isActive) {
+                if (!isPaused) {
+                    val elapsed = (System.currentTimeMillis() - startTimeMillis) / 1000
+                    binding.tvTimer.text = String.format("Elapsed: %02d:%02d", elapsed / 60, elapsed % 60)
+                    
+                    if (totalItemsCount > 1 && processedItemsCount > 0) {
+                        val avgTimePerItem = elapsed.toDouble() / processedItemsCount
+                        val remainingItems = totalItemsCount - processedItemsCount
+                        val remainingSeconds = (remainingItems * avgTimePerItem).toLong()
+                        binding.tvRemaining.text = String.format("Rem: ~%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
+                    } else {
+                        binding.tvRemaining.text = ""
+                    }
+                } else {
+                    startTimeMillis += 1000 
+                }
+                delay(1000)
+            }
         }
     }
 
-    private fun buildMassiveResultText(results: List<CheckResult>): String = buildString {
-        append("=== SNI Pinger Massive ===\n")
-        append("IP: ${etIp.text}\n")
-        append("Total: ${results.size} | Working: ${results.count { it.tlsOk == true }}\n\n")
-        results.forEach { r ->
-            val status = when { r.tlsOk == true -> "OK"; r.tcpReachable == true -> "TLS_FAIL"; else -> "BLOCKED" }
-            append("═══════════════════════════════════\n")
-            append("SNI: ${r.sni}\n")
-            append("Status: $status\n")
-            append("RTT: ${r.rttMs?.toInt()}ms\n")
-            append("TLS: ${r.tlsOk} (${r.tlsVersion})\n")
-            if (r.domainOwnerOrg != null) append("Owner: ${r.domainOwnerOrg}\n")
-            if (r.ipGeoInfo != null) append("Geo: ${r.ipGeoInfo?.city}, ${r.ipGeoInfo?.country} (${r.ipGeoInfo?.org})\n")
-            if (r.errors.isNotEmpty()) append("Errors: ${r.errors.joinToString("; ")}\n")
-            append("═══════════════════════════════════\n\n")
-        }
+    private fun stopTimer() {
+        timerJob?.cancel()
     }
 
     private fun copyToClipboard(text: String) {
-        val cb = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cb.setPrimaryClip(ClipData.newPlainText("SNI Pinger", text))
-        Toast.makeText(this, "Скопировано!", Toast.LENGTH_SHORT).show()
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("SNI Results", text))
+        Toast.makeText(this, "Copied to clipboard", Toast.LENGTH_SHORT).show()
     }
 
-    private fun appendToTerminal(text: String) {
-        if (isCancelled && text != "[CANCELLED]") return
-        runOnUiThread {
-            if (text.isNotEmpty()) terminalLog.append(text).append("\n")
-            tvTerminal.text = terminalLog.toString()
-            scrollToBottom()
+    private fun buildMassiveResultText(results: List<CheckResult>): String = buildString {
+        append("=== SNI Pinger Results ===\n")
+        results.forEach { 
+            val status = when { it.tlsOk == true -> "OK"; it.tcpReachable == true -> "TLS_FAIL"; else -> "BLOCKED" }
+            append("${it.sni}: $status (${it.rttMs?.toInt() ?: "--"}ms)\n")
         }
     }
 
-    private fun scrollToBottom() {
-        (tvTerminal.parent as? NestedScrollView)?.post { tvTerminal.parent?.let { (it as? NestedScrollView)?.fullScroll(View.FOCUS_DOWN) } }
-    }
+    private fun Int.toPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     override fun onDestroy() {
         super.onDestroy()
-        isCancelled = true
         checkJob?.cancel()
+        timerJob?.cancel()
         scope.cancel()
     }
+
+    enum class CheckMode { SINGLE, WHITELIST, MASSIVE }
 }

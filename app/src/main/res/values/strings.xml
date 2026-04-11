@@ -1,3 +1,37 @@
 <resources>
     <string name="app_name">SNI PINGER</string>
+    <string name="mode_single">Single</string>
+    <string name="mode_whitelist">Whitelist</string>
+    <string name="mode_massive">Massive</string>
+    <string name="ip_address">IP Address</string>
+    <string name="sni_host">SNI Host</string>
+    <string name="sni_list_hint">SNI List (one per line)</string>
+    <string name="btn_check">Check</string>
+    <string name="btn_checking">Checking...</string>
+    <string name="btn_pause">Pause</string>
+    <string name="btn_resume">Resume</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_copy_all">Copy All</string>
+    <string name="btn_copy">Copy</string>
+    <string name="low_ping_filter">≤100ms</string>
+    <string name="terminal_title">TERMINAL</string>
+    <string name="raw_data">Raw Data</string>
+    <string name="copy_success">Copied to clipboard!</string>
+    <string name="error_loading_whitelist">Error loading whitelist</string>
+    <string name="check_complete">Check Complete</string>
+    <string name="waiting_resume">Waiting for resume...</string>
+    <string name="loading_whitelist">Loading whitelist...</string>
+    <string name="total_time">Total time: %1$.2fs</string>
+
+    <string name="verdict_ok_full">✅ IN WHITELIST — TCP + TLS + HTTP OK</string>
+    <string name="verdict_ok_tls">✅ PROBABLY IN WHITELIST — TCP + TLS OK</string>
+    <string name="verdict_blocked_tcp">❌ BLOCKED — TCP Failed</string>
+    <string name="verdict_uncertain_dpi">⚠️ UNCERTAIN — TCP OK, TLS Failed (DPI?)</string>
+    <string name="verdict_uncertain_data">⚠️ UNCERTAIN — Not enough data</string>
+
+    <string name="time_elapsed">Elapsed: %1$02d:%2$02d</string>
+    <string name="time_remaining">Remaining: ~%1$02d:%2$02d</string>
+    <string name="select_language">Select Language</string>
+    <string name="lang_downloading">Downloading language pack...</string>
+    <string name="err_empty_ip">Please enter an IP address</string>
 </resources>

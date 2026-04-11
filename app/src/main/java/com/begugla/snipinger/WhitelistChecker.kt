@@ -12,42 +12,39 @@ import kotlinx.coroutines.*
 class WhitelistChecker {
 
     fun checkIp(
-        ip: String,
+        inputIp: String,
         sni: String,
         timeout: Int = 5
     ): CheckResult {
+        // Point 2: Resolve hostname to IP if needed
+        val ip = try {
+            InetAddress.getByName(inputIp).hostAddress ?: inputIp
+        } catch (e: Exception) {
+            inputIp
+        }
+
         val result = CheckResult(ip = ip, sni = sni, port = 443, timeout = timeout.toFloat())
         val startTime = System.currentTimeMillis()
         val timeoutMs = timeout * 1000
-        // Tighter timeouts for secondary checks to keep total time manageable
         val secondaryTimeoutMs = minOf(3000, timeoutMs)
 
         try {
-            // ============ Phase 1: Parallel lightweight checks ============
             runBlocking {
-                // All these are independent and network-bound — run them concurrently
                 val geoJob = async(Dispatchers.IO) { _ipGeoInfo(ip, result) }
                 val domainJob = async(Dispatchers.IO) { _sniOwnership(sni, result) }
                 val dnsJob = async(Dispatchers.IO) { _dnsCheck(sni, ip, result) }
                 val pingJob = async(Dispatchers.IO) { _approximatePing(ip, secondaryTimeoutMs, result) }
                 val portsJob = async(Dispatchers.IO) { _tcpPorts(ip, secondaryTimeoutMs, result) }
 
-                // All start at the same time, wait for all to finish
                 awaitAll(geoJob, domainJob, dnsJob, pingJob, portsJob)
             }
 
-            // ============ Phase 2: Sequential TCP + TLS + HTTP (these depend on each other) ============
-
-            // Step 1: TCP connect to 443
             val socket = _connectSocket(ip, 443, timeoutMs, result)
 
             if (socket != null) {
-                // Step 2: Full TLS Handshake (reuses existing socket)
                 _fullTlsHandshake(socket, sni, timeoutMs, result)
 
-                // Step 3: Parallel TLS version checks and H2 + HTTP checks
                 runBlocking {
-                    // TLS 1.2 and 1.3 checks are independent
                     val tls12Job = async(Dispatchers.IO) {
                         _tlsVersionCheck(ip, sni, "TLSv1.2", secondaryTimeoutMs) { ok ->
                             result.tls12Ok = ok
@@ -64,7 +61,6 @@ class WhitelistChecker {
                         }
                     }
                     val httpJob = async(Dispatchers.IO) {
-                        // Combined HTTP: do GET to capture status/headers, then HEAD if needed
                         _combinedHttpCheck(ip, sni, timeoutMs, result)
                     }
 
@@ -80,8 +76,6 @@ class WhitelistChecker {
         return result
     }
 
-    // ===== Phase 1: Parallel independent checks =====
-
     private fun _ipInfo(ip: String, result: CheckResult) {
         try {
             val addr = InetAddress.getByName(ip)
@@ -94,7 +88,7 @@ class WhitelistChecker {
     }
 
     private fun _ipGeoInfo(ip: String, result: CheckResult) {
-        _ipInfo(ip, result) // Also sets local IP info
+        _ipInfo(ip, result)
         try {
             val info = IpInfoChecker.getIpInfo(ip)
             if (info != null) result.ipGeoInfo = info
@@ -167,8 +161,6 @@ class WhitelistChecker {
             callback(false, null)
         }
     }
-
-    // ===== Phase 2: Sequential TCP 443 + TLS + HTTP =====
 
     private fun _connectSocket(ip: String, port: Int, timeoutMs: Int, result: CheckResult): Socket? {
         val socket = Socket()
@@ -300,10 +292,6 @@ class WhitelistChecker {
         }
     }
 
-    /**
-     * Combined HTTP check: does a single connection, sends GET to capture status+headers,
-     * then immediately sends HEAD on the same connection. Much faster than two separate connections.
-     */
     private fun _combinedHttpCheck(ip: String, sni: String, timeoutMs: Int, result: CheckResult) {
         try {
             val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
@@ -332,7 +320,6 @@ class WhitelistChecker {
             val out = sslSocket.outputStream
             val inp = sslSocket.inputStream
 
-            // === First: GET ===
             val getRequest = "GET / HTTP/1.1\r\n" +
                     "Host: $sni\r\n" +
                     "User-Agent: Mozilla/5.0 SNI-Pinger/1.0\r\n" +
@@ -351,9 +338,7 @@ class WhitelistChecker {
                 result.httpRedirectLocation = getResponse.headers["location"]
                 result.httpOk = true
 
-                // Consume body if present to keep connection alive for HEAD
                 getResponse.contentLength?.let { length ->
-                    // Read exactly content-length bytes (or up to 64KB for safety)
                     val buf = ByteArray(minOf(length.toInt(), 65536))
                     var totalRead = 0
                     while (totalRead < length) {
@@ -362,12 +347,9 @@ class WhitelistChecker {
                         totalRead += read
                     }
                 } ?: run {
-                    // No content-length: try to read chunked or just wait a brief moment
-                    // For safety, skip body reading on non-chunked
                     Thread.sleep(100)
                 }
 
-                // === Second: HEAD (on same connection if possible) ===
                 val headRequest = "HEAD / HTTP/1.1\r\n" +
                         "Host: $sni\r\n" +
                         "User-Agent: Mozilla/5.0 SNI-Pinger/1.0\r\n" +
@@ -408,23 +390,22 @@ class WhitelistChecker {
         return HttpResponse(statusLine, code, headers, contentLength)
     }
 
-    // ===== Verdict =====
     private fun _makeVerdict(r: CheckResult) {
         if (r.tcpReachable == false) {
             r.inWhitelist = false
-            r.verdict = "❌ НЕ В БЕЛОМ СПИСКЕ — TCP заблокирован"
+            r.verdict = "VERDICT_BLOCKED_TCP"
         } else if (r.tcpReachable == true && r.tlsOk == false) {
             r.inWhitelist = null
-            r.verdict = "⚠️ НЕОДНОЗНАЧНО — TCP проходит, TLS нет (возможно DPI)"
+            r.verdict = "VERDICT_UNCERTAIN_DPI"
         } else if (r.tlsOk == true && r.httpStatusCode != null) {
             r.inWhitelist = true
-            r.verdict = "✅ В БЕЛОМ СПИСКЕ — TCP + TLS + HTTP работают"
+            r.verdict = "VERDICT_OK_FULL"
         } else if (r.tlsOk == true) {
             r.inWhitelist = true
-            r.verdict = "✅ ВЕРОЯТНО В БЕЛОМ СПИСКЕ — TCP + TLS прошли"
+            r.verdict = "VERDICT_OK_TLS"
         } else {
             r.inWhitelist = null
-            r.verdict = "⚠️ НЕОДНОЗНАЧНО — недостаточно данных"
+            r.verdict = "VERDICT_UNCERTAIN_DATA"
         }
     }
 }
