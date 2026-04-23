@@ -28,31 +28,31 @@
                 android:layout_gravity="end"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingEnd="8dp">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnThemeToggle"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    app:icon="@drawable/ic_theme_auto" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLangToggle"
-                    style="@style/Widget.Material3.Button.IconButton"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    app:icon="@drawable/ic_language" />
+                android:paddingEnd="4dp">
 
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:id="@+id/loadingIndicator"
                     android:layout_width="24dp"
                     android:layout_height="24dp"
-                    android:layout_margin="12dp"
+                    android:layout_margin="10dp"
                     android:indeterminate="true"
                     android:visibility="gone"
-                    app:indicatorSize="24dp"
+                    app:indicatorSize="22dp"
                     app:trackThickness="3dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnThemeToggle"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    app:icon="@drawable/ic_theme_auto" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnLangToggle"
+                    style="@style/Widget.Material3.Button.IconButton"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    app:icon="@drawable/ic_language" />
 
                 <ImageButton
                     android:id="@+id/btnPause"
@@ -71,6 +71,7 @@
                     android:src="@android:drawable/ic_menu_close_clear_cancel"
                     android:visibility="gone"
                     app:tint="@color/error" />
+
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
     </com.google.android.material.appbar.AppBarLayout>
@@ -80,20 +81,23 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:paddingBottom="220dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingHorizontal="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="16dp">
 
+            <!-- Input Card -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/Widget.Material3.CardView.Elevated"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="24dp">
+                app:cardCornerRadius="24dp"
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -101,11 +105,12 @@
                     android:orientation="vertical"
                     android:padding="20dp">
 
+                    <!-- Mode Toggle Group -->
                     <com.google.android.material.button.MaterialButtonToggleGroup
                         android:id="@+id/toggleGroup"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="20dp"
                         app:checkedButton="@+id/btnModeSingle"
                         app:selectionRequired="true"
                         app:singleSelection="true">
@@ -114,52 +119,54 @@
                             android:id="@+id/btnModeSingle"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="wrap_content"
+                            android:layout_height="match_parent"
                             android:layout_weight="1"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
-                            android:paddingLeft="4dp"
-                            android:paddingRight="4dp"
+                            android:paddingHorizontal="4dp"
                             android:text="@string/mode_single"
-                            android:textSize="12sp" />
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
 
                         <Button
                             android:id="@+id/btnModeWhitelist"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="wrap_content"
+                            android:layout_height="match_parent"
                             android:layout_weight="1"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
-                            android:paddingLeft="4dp"
-                            android:paddingRight="4dp"
+                            android:paddingHorizontal="4dp"
                             android:text="@string/mode_whitelist"
-                            android:textSize="12sp" />
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
 
                         <Button
                             android:id="@+id/btnModeMassive"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
-                            android:layout_height="wrap_content"
+                            android:layout_height="match_parent"
                             android:layout_weight="1"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
-                            android:paddingLeft="4dp"
-                            android:paddingRight="4dp"
+                            android:paddingHorizontal="4dp"
                             android:text="@string/mode_massive"
-                            android:textSize="12sp" />
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
                     </com.google.android.material.button.MaterialButtonToggleGroup>
 
+                    <!-- IP Input -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/tilIp"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:hint="@string/ip_address"
-                        app:boxCornerRadiusBottomEnd="16dp"
-                        app:boxCornerRadiusBottomStart="16dp"
-                        app:boxCornerRadiusTopEnd="16dp"
                         app:boxCornerRadiusTopStart="16dp"
+                        app:boxCornerRadiusTopEnd="16dp"
+                        app:boxCornerRadiusBottomStart="16dp"
+                        app:boxCornerRadiusBottomEnd="16dp"
                         app:startIconDrawable="@android:drawable/ic_menu_compass">
 
                         <com.google.android.material.textfield.TextInputEditText
@@ -170,6 +177,7 @@
                             android:text="1.1.1.1" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- SNI (single mode) -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/tilSni"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -177,10 +185,10 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:hint="@string/sni_host"
-                        app:boxCornerRadiusBottomEnd="16dp"
-                        app:boxCornerRadiusBottomStart="16dp"
-                        app:boxCornerRadiusTopEnd="16dp"
                         app:boxCornerRadiusTopStart="16dp"
+                        app:boxCornerRadiusTopEnd="16dp"
+                        app:boxCornerRadiusBottomStart="16dp"
+                        app:boxCornerRadiusBottomEnd="16dp"
                         app:startIconDrawable="@android:drawable/ic_menu_share">
 
                         <com.google.android.material.textfield.TextInputEditText
@@ -191,6 +199,7 @@
                             android:text="vk.com" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- SNI List (massive mode) -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/tilSniList"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -199,10 +208,13 @@
                         android:layout_marginTop="12dp"
                         android:hint="@string/sni_list_hint"
                         android:visibility="gone"
-                        app:boxCornerRadiusBottomEnd="16dp"
-                        app:boxCornerRadiusBottomStart="16dp"
+                        app:boxCornerRadiusTopStart="16dp"
                         app:boxCornerRadiusTopEnd="16dp"
-                        app:boxCornerRadiusTopStart="16dp">
+                        app:boxCornerRadiusBottomStart="16dp"
+                        app:boxCornerRadiusBottomEnd="16dp"
+                        app:endIconDrawable="@android:drawable/ic_menu_upload"
+                        app:endIconMode="custom"
+                        app:endIconContentDescription="@string/btn_upload_txt">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etSniList"
@@ -213,48 +225,102 @@
                             android:minLines="3" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- List controls (whitelist/massive) -->
                     <LinearLayout
                         android:id="@+id/listControls"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:gravity="center_vertical"
+                        android:orientation="vertical"
                         android:visibility="gone">
 
-                        <com.google.android.material.checkbox.MaterialCheckBox
-                            android:id="@+id/chkLowPing"
-                            android:layout_width="0dp"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/low_ping_filter" />
+                            android:gravity="center_vertical">
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnCopyAll"
-                            style="@style/Widget.Material3.Button.TextButton"
-                            android:layout_width="wrap_content"
+                            <com.google.android.material.checkbox.MaterialCheckBox
+                                android:id="@+id/chkLowPing"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/low_ping_filter" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnExportCsv"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/btn_export_csv"
+                                android:visibility="gone" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnCopyAll"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/btn_copy_all"
+                                android:visibility="gone" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="@string/btn_copy_all"
-                            android:visibility="gone" />
+                            android:layout_marginTop="4dp"
+                            android:gravity="center_vertical">
+
+                            <com.google.android.material.checkbox.MaterialCheckBox
+                                android:id="@+id/chkFastMode"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/fast_mode_label" />
+
+                            <TextView
+                                android:id="@+id/tvThreadsLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                                android:textStyle="bold"
+                                android:visibility="gone"
+                                tools:text="× 4" />
+
+                            <com.google.android.material.slider.Slider
+                                android:id="@+id/sliderThreads"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:stepSize="1"
+                                android:value="4"
+                                android:valueFrom="2"
+                                android:valueTo="10"
+                                android:visibility="gone"
+                                app:tickVisible="true" />
+                        </LinearLayout>
                     </LinearLayout>
 
+                    <!-- Check Button -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnCheck"
                         android:layout_width="match_parent"
-                        android:layout_height="64dp"
+                        android:layout_height="60dp"
                         android:layout_marginTop="20dp"
                         android:text="@string/btn_check"
                         android:textSize="16sp"
+                        android:textStyle="bold"
                         app:cornerRadius="20dp" />
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Progress Card -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardProgress"
                 style="@style/Widget.Material3.CardView.Elevated"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 android:visibility="gone"
                 app:cardCornerRadius="20dp">
 
@@ -264,60 +330,86 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
-                    <TextView
-                        android:id="@+id/tvProgress"
-                        android:layout_width="wrap_content"
+                    <!-- Current SNI + count -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-                        tools:text="Checking..." />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
+
+                        <TextView
+                            android:id="@+id/tvProgress"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            tools:text="Checking vk.com..." />
+
+                        <TextView
+                            android:id="@+id/tvProgressPercent"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                            android:textColor="?attr/colorPrimary"
+                            android:textStyle="bold"
+                            tools:text="42%" />
+
+                    </LinearLayout>
 
                     <com.google.android.material.progressindicator.LinearProgressIndicator
                         android:id="@+id/progressBar"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
                         app:trackCornerRadius="4dp" />
 
-                    <RelativeLayout
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp">
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal">
 
                         <TextView
                             android:id="@+id/tvTimer"
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_alignParentStart="true"
+                            android:layout_weight="1"
                             android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                            android:alpha="0.7"
+                            android:alpha="0.65"
                             tools:text="Elapsed: 00:05" />
 
                         <TextView
                             android:id="@+id/tvRemaining"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_centerHorizontal="true"
+                            android:layout_marginStart="8dp"
                             android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                            android:alpha="0.7"
-                            tools:text="Remaining: ~00:20" />
+                            android:alpha="0.65"
+                            tools:text="Rem: ~00:20" />
 
                         <TextView
                             android:id="@+id/tvProgressCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
+                            android:layout_marginStart="8dp"
                             android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-                            tools:text="1/100" />
-                    </RelativeLayout>
+                            android:textStyle="bold"
+                            tools:text="42/100" />
+
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Verdict Card -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardVerdict"
                 style="@style/Widget.Material3.CardView.Filled"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 android:visibility="gone"
                 app:cardCornerRadius="24dp">
 
@@ -333,7 +425,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="16dp"
-                        android:textSize="32sp" />
+                        android:textSize="36sp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -352,13 +444,14 @@
                             android:id="@+id/tvTotalTime"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="3dp"
                             android:textAppearance="@style/TextAppearance.Material3.BodySmall"
                             android:alpha="0.8" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Results Sections -->
             <LinearLayout
                 android:id="@+id/layoutResults"
                 android:layout_width="match_parent"
@@ -373,12 +466,13 @@
                 <include android:id="@+id/sectionHttp" layout="@layout/item_result_section" />
                 <include android:id="@+id/sectionDns" layout="@layout/item_result_section" />
 
+                <!-- Raw Output Card -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardRawOutput"
                     style="@style/Widget.Material3.CardView.Outlined"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="4dp"
                     android:visibility="gone"
                     app:cardCornerRadius="20dp">
 
@@ -391,14 +485,23 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:gravity="center_vertical">
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="8dp">
 
                             <TextView
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:text="@string/raw_data"
-                                android:textAppearance="@style/TextAppearance.Material3.LabelLarge" />
+                                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                                android:textStyle="bold" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnExportCsvSingle"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/btn_export_csv" />
 
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/btnCopyRaw"
@@ -413,25 +516,27 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:fontFamily="monospace"
-                            android:textSize="11sp" />
+                            android:textSize="11sp"
+                            android:alpha="0.8" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+
             </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Fixed Floating Terminal at the bottom -->
+    <!-- Floating Terminal -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardTerminal"
         android:layout_width="match_parent"
         android:layout_height="200dp"
         android:layout_gravity="bottom"
-        android:visibility="gone"
-        app:cardCornerRadius="24dp"
-        app:cardElevation="12dp"
         android:layout_margin="8dp"
+        android:visibility="gone"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="16dp"
         app:strokeWidth="1dp"
-        app:strokeColor="@color/terminal_text">
+        app:strokeColor="@color/terminal_stroke">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -439,12 +544,13 @@
             android:background="@color/terminal_bg"
             android:orientation="vertical">
 
+            <!-- Terminal Header -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="8dp">
+                android:paddingHorizontal="14dp"
+                android:background="#0DFFFFFF">
 
                 <TextView
                     android:layout_width="0dp"
@@ -453,7 +559,8 @@
                     android:text="@string/terminal_title"
                     android:textColor="@color/terminal_text"
                     android:textStyle="bold"
-                    android:letterSpacing="0.1"
+                    android:fontFamily="monospace"
+                    android:letterSpacing="0.15"
                     android:textSize="12sp" />
 
                 <ImageButton
@@ -468,15 +575,14 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="#333" />
+                android:background="@color/terminal_divider" />
 
             <androidx.core.widget.NestedScrollView
                 android:id="@+id/terminalScrollView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:fillViewport="true"
-                android:scrollbars="vertical"
-                android:scrollbarThumbVertical="@android:color/darker_gray">
+                android:scrollbars="vertical">
 
                 <TextView
                     android:id="@+id/tvTerminal"
@@ -485,8 +591,10 @@
                     android:fontFamily="monospace"
                     android:padding="12dp"
                     android:textColor="@color/terminal_text"
+                    android:lineSpacingMultiplier="1.3"
                     android:textSize="11sp" />
             </androidx.core.widget.NestedScrollView>
+
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

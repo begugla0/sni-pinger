@@ -36,8 +36,10 @@
     <color name="warning">#FF9800</color>
     <color name="info">#2196F3</color>
 
-    <color name="terminal_bg">#000000</color>
-    <color name="terminal_text">#00FF00</color>
+    <color name="terminal_bg">#0D0D0D</color>
+    <color name="terminal_text">#00E676</color>
+    <color name="terminal_stroke">#1A1A1A</color>
+    <color name="terminal_divider">#222222</color>
 
     <color name="verdict_ok_bg_light">#E8F5E9</color>
     <color name="verdict_ok_text_light">#2E7D32</color>

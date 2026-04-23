@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew.bat assembleDebug --no-daemon -q)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; & \".\\\\gradlew.bat\" \"assembleDebug\" \"--no-daemon\" \"-q\" 2>&1 | Select-Object -Last 120)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; & \".\\\\gradlew.bat\" \"assembleDebug\" \"--no-daemon\" 2>&1 | Select-Object -Last 80)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; & \".\\\\gradlew.bat\" \"clean\" \"compileDebugKotlin\" \"--no-daemon\" 2>&1 | Select-Object -Last 150)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; & \".\\\\gradlew.bat\" \"assembleDebug\" \"--no-daemon\" 2>&1 | Select-Object -Last 50)",
+      "PowerShell($env:JAVA_HOME = \"C:\\\\Program Files\\\\Android\\\\Android Studio\\\\jbr\"; & \".\\\\gradlew.bat\" \"assembleDebug\" \"--no-daemon\" 2>&1 | Select-Object -Last 60)"
+    ]
+  }
+}

@@ -13,6 +13,8 @@
     <string name="btn_cancel">Отмена</string>
     <string name="btn_copy_all">Копировать всё</string>
     <string name="btn_copy">Копировать</string>
+    <string name="btn_export_csv">Экспорт CSV</string>
+    <string name="btn_upload_txt">Загрузить .txt</string>
     <string name="low_ping_filter">≤100мс</string>
     <string name="terminal_title">ТЕРМИНАЛ</string>
     <string name="raw_data">Сырые данные</string>
@@ -33,4 +35,60 @@
     <string name="time_remaining">Осталось: ~%1$02d:%2$02d</string>
     <string name="select_language">Выберите язык</string>
     <string name="lang_downloading">Загрузка языкового пакета...</string>
+    <string name="err_empty_ip">Введите IP адрес</string>
+    <string name="select_language_hint">Язык интерфейса</string>
+
+    <string name="section_geo">📡 Гео Информация</string>
+    <string name="section_tcp">🔌 TCP</string>
+    <string name="section_tls">🔒 TLS</string>
+    <string name="section_http">🌐 HTTP</string>
+    <string name="section_dns">🔍 DNS</string>
+    <string name="lang_error">Не удалось загрузить языковой пакет. Проверьте соединение.</string>
+    <string name="btn_retry">Повторить</string>
+    <string name="progress_percent">%1$d%%</string>
+
+    <!-- Whitelist download dialog -->
+    <string name="whitelist_dl_title">Скачать whitelist</string>
+    <string name="whitelist_dl_message">Приложению нужно скачать список мобильного интернета (whitelist), прежде чем работать с режимом Whitelist. Файл будет сохранён локально — проверки будут мгновенными и работать без сети.</string>
+    <string name="whitelist_dl_btn">Скачать</string>
+    <string name="whitelist_dl_downloading">Загрузка…</string>
+    <string name="whitelist_dl_failed">Ошибка загрузки: %1$s</string>
+    <string name="whitelist_dl_success">Whitelist сохранён (%1$d записей)</string>
+    <string name="whitelist_update_found">Whitelist обновлён (%1$d записей)</string>
+    <string name="whitelist_update_none">Whitelist актуален</string>
+    <string name="whitelist_update_offline">Используется кэш whitelist (нет сети)</string>
+    <string name="whitelist_loaded_cache">Загружено %1$d записей из кэша</string>
+
+    <!-- Background service -->
+    <string name="bg_channel_name">Прогресс проверки</string>
+    <string name="bg_channel_desc">Показывает запущенные проверки пока приложение в фоне</string>
+    <string name="bg_service_title">SNI Pinger</string>
+    <string name="bg_service_text">Проверка…</string>
+    <string name="bg_permission_title">Работа в фоне</string>
+    <string name="bg_permission_message">Разрешите уведомления, чтобы длительные проверки могли продолжаться, когда приложение в фоне.</string>
+    <string name="bg_permission_accept">Разрешить</string>
+    <string name="bg_permission_deny">Не сейчас</string>
+    <string name="battery_ignore_title">Батарея и фон</string>
+    <string name="battery_ignore_message">Отключите оптимизацию батареи для этого приложения, чтобы длительные проверки не прерывались в фоне.</string>
+
+    <!-- CSV export -->
+    <string name="csv_saved">CSV сохранён</string>
+    <string name="csv_failed">Не удалось сохранить CSV: %1$s</string>
+    <string name="csv_nothing">Нечего экспортировать</string>
+    <string name="txt_loaded">Загружено %1$d записей из файла</string>
+    <string name="txt_load_failed">Не удалось прочитать файл: %1$s</string>
+
+    <!-- Fast mode -->
+    <string name="fast_mode_label">⚡ Быстро (менее точно)</string>
+    <string name="fast_mode_threads">× %1$d</string>
+
+    <!-- Notification detail -->
+    <string name="notif_sub">%1$d / %2$d · %3$d%%</string>
+    <string name="notif_text_fmt">%1$s — %2$s / ~%3$s</string>
+    <string name="notif_big_current">Сейчас: %1$s</string>
+    <string name="notif_big_progress">Прогресс: %1$d / %2$d (%3$d%%)</string>
+    <string name="notif_big_elapsed">Прошло: %1$s</string>
+    <string name="notif_big_remaining">Осталось: ~%1$s</string>
+    <string name="notif_big_mode_fast">Режим: быстро × %1$d</string>
+    <string name="notif_big_mode_seq">Режим: последовательный</string>
 </resources>

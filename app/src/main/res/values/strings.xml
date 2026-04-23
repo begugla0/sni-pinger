@@ -13,6 +13,8 @@
     <string name="btn_cancel">Cancel</string>
     <string name="btn_copy_all">Copy All</string>
     <string name="btn_copy">Copy</string>
+    <string name="btn_export_csv">Export CSV</string>
+    <string name="btn_upload_txt">Load .txt</string>
     <string name="low_ping_filter">≤100ms</string>
     <string name="terminal_title">TERMINAL</string>
     <string name="raw_data">Raw Data</string>
@@ -34,4 +36,58 @@
     <string name="select_language">Select Language</string>
     <string name="lang_downloading">Downloading language pack...</string>
     <string name="err_empty_ip">Please enter an IP address</string>
+
+    <string name="section_geo">📡 Geo Info</string>
+    <string name="section_tcp">🔌 TCP</string>
+    <string name="section_tls">🔒 TLS</string>
+    <string name="section_http">🌐 HTTP</string>
+    <string name="section_dns">🔍 DNS</string>
+    <string name="lang_error">Failed to load language pack. Check your connection.</string>
+    <string name="btn_retry">Retry</string>
+    <string name="progress_percent">%1$d%%</string>
+
+    <!-- Whitelist download dialog -->
+    <string name="whitelist_dl_title">Download whitelist</string>
+    <string name="whitelist_dl_message">The app needs to download the mobile-internet whitelist before you can use whitelist checks. The file will be saved locally so checks work instantly and offline.</string>
+    <string name="whitelist_dl_btn">Download</string>
+    <string name="whitelist_dl_downloading">Downloading…</string>
+    <string name="whitelist_dl_failed">Download failed: %1$s</string>
+    <string name="whitelist_dl_success">Whitelist saved (%1$d entries)</string>
+    <string name="whitelist_update_found">Whitelist updated (%1$d entries)</string>
+    <string name="whitelist_update_none">Whitelist up to date</string>
+    <string name="whitelist_update_offline">Using cached whitelist (offline)</string>
+    <string name="whitelist_loaded_cache">Loaded %1$d entries from cache</string>
+
+    <!-- Background service -->
+    <string name="bg_channel_name">Check progress</string>
+    <string name="bg_channel_desc">Shows running checks while the app is in background</string>
+    <string name="bg_service_title">SNI Pinger</string>
+    <string name="bg_service_text">Checking…</string>
+    <string name="bg_permission_title">Allow background work</string>
+    <string name="bg_permission_message">Allow notifications so long checks can continue when you switch away from the app.</string>
+    <string name="bg_permission_accept">Allow</string>
+    <string name="bg_permission_deny">Not now</string>
+    <string name="battery_ignore_title">Background battery</string>
+    <string name="battery_ignore_message">Disable battery optimizations for this app so long checks are not killed in background.</string>
+
+    <!-- CSV export -->
+    <string name="csv_saved">CSV saved</string>
+    <string name="csv_failed">Failed to save CSV: %1$s</string>
+    <string name="csv_nothing">Nothing to export</string>
+    <string name="txt_loaded">Loaded %1$d entries from file</string>
+    <string name="txt_load_failed">Failed to read file: %1$s</string>
+
+    <!-- Fast mode -->
+    <string name="fast_mode_label">⚡ Fast (may be less accurate)</string>
+    <string name="fast_mode_threads">× %1$d</string>
+
+    <!-- Notification detail -->
+    <string name="notif_sub">%1$d / %2$d · %3$d%%</string>
+    <string name="notif_text_fmt">%1$s — %2$s / ~%3$s</string>
+    <string name="notif_big_current">Now: %1$s</string>
+    <string name="notif_big_progress">Progress: %1$d / %2$d (%3$d%%)</string>
+    <string name="notif_big_elapsed">Elapsed: %1$s</string>
+    <string name="notif_big_remaining">Remaining: ~%1$s</string>
+    <string name="notif_big_mode_fast">Mode: fast × %1$d</string>
+    <string name="notif_big_mode_seq">Mode: sequential</string>
 </resources>
